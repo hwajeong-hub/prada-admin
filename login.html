@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRADA 로그인</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<style>
+/* =========================================================
+   1. Foundation 토큰 — PRADA_DESIGN_RULES.md §1, §6
+   ========================================================= */
+:root {
+  --font-family: "Pretendard", -apple-system, sans-serif;
+  --letter-spacing: -0.02em;
+
+  --text-primary: #111111;
+  --text-subtle: #9e9e9e;
+  --text-disabled: #dddddd;
+  --text-inverse: #ffffff;
+  --text-error: #fe1818;
+
+  --bg-surface: #ffffff;
+  --bg-disabled: #f5f5f5;
+  --bg-brand: #1b2a41;
+  --bg-brand-hover: #2d3f5c;
+
+  --border-primary: #9e9e9e;
+  --border-secondary: #dddddd;
+  --border-tertiary: #eeeeee;
+  --border-disabled: #e4e4e4;
+  --border-brand: #1b2a41;
+  --border-error: #fe1818;
+
+  --icon-brand: #1b2a41;
+
+  --radius-xxs: 2px;
+  --radius-xs: 4px;
+  --radius-m: 8px;
+
+  --shadow-3: 2px 3px 12px rgba(11, 25, 47, .08);
+
+  --control-h-lg: 40px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }   /* Figma 테두리 = inside */
+* { margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font-family);
+  letter-spacing: var(--letter-spacing);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  -webkit-font-smoothing: antialiased;
+}
+button, input { font-family: inherit; letter-spacing: inherit; }
+
+/* Text Style (§1.3) */
+.label-1-regular { font: 400 13px/20px var(--font-family); letter-spacing: var(--letter-spacing); }
+.label-1-medium  { font: 500 13px/20px var(--font-family); letter-spacing: var(--letter-spacing); }
+.label-2-regular { font: 400 12px/16px var(--font-family); letter-spacing: var(--letter-spacing); }
+
+/* =========================================================
+   2. 컴포넌트 — §2
+   ========================================================= */
+
+/* Text Input: 높이 40, 패딩 16, 1px 테두리 (로그인만 radius 4) */
+.text-input {
+  display: block;
+  width: 100%;
+  height: var(--control-h-lg);
+  padding: 0 15px;                                     /* Figma 16 - 테두리 1 */
+  border: 1px solid var(--border-primary);            /* Default / Completed */
+  border-radius: 0;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  caret-color: var(--icon-brand);
+  outline: none;
+}
+.text-input::placeholder { color: var(--text-subtle); opacity: 1; }
+.text-input:hover,
+.text-input:focus { border-color: var(--border-brand); } /* Hovered / Focused / Typing */
+.text-input[aria-invalid="true"] { border-color: var(--border-error); }
+.text-input:disabled { background: var(--bg-disabled); border-color: var(--border-secondary); }
+
+/* Button / Primary / Large: 높이 40, 패딩 16, radius 0 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+.btn--lg { height: var(--control-h-lg); padding: 0 16px; }
+.btn--primary { background: var(--bg-brand); color: var(--text-inverse); }
+.btn--primary:hover { background: var(--bg-brand-hover); }
+.btn--primary:disabled { background: var(--bg-disabled); color: var(--text-disabled); cursor: default; }
+.btn:focus-visible { outline: 2px solid var(--border-brand); outline-offset: 2px; }
+
+/* Check Box List / Small: 박스 16 radius 2, 간격 8, 체크 아이콘 14 가운데 */
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+.checkbox__input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.checkbox__box {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-brand);              /* OFF */
+  border-radius: var(--radius-xxs);
+  background: var(--bg-surface);
+}
+.checkbox__box svg { display: block; visibility: hidden; }
+.checkbox__input:checked + .checkbox__box { background: var(--icon-brand); border-color: var(--icon-brand); } /* ON */
+.checkbox__input:checked + .checkbox__box svg { visibility: visible; }
+.checkbox__input:focus-visible + .checkbox__box { outline: 2px solid var(--border-brand); outline-offset: 2px; }
+
+/* Alert / Slim: 400×56, 패딩 16(테두리 1 포함 → 세로 15), radius 8, Depth 3 */
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 400px;
+  max-width: calc(100% - 40px);                       /* 모바일 360 → 320 (좌우 20) */
+  min-height: 56px;
+  padding: 15px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-tertiary);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-3);
+  color: var(--text-primary);
+}
+.alert svg { flex: none; display: block; }
+
+/* 인터랙션 모션 공통 규칙 — 상태 변화 200ms ease (PRADA_DESIGN_RULES.md §2 "모션 공통 규칙") */
+:root { --motion-state: .2s ease; --motion-enter: 150ms ease-out; }
+.btn { transition: background-color var(--motion-state), border-color var(--motion-state), color var(--motion-state); }
+.text-input { transition: border-color var(--motion-state); }
+.checkbox__box { transition: background-color var(--motion-state), border-color var(--motion-state); }
+@keyframes fade-in { from { opacity: 0; } }
+.auth { animation: fade-in var(--motion-enter) both; }   /* 화면 진입 페이드 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+}
+
+/* =========================================================
+   3. 템플릿 — §3.1 인증 화면
+   ========================================================= */
+.auth {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;                     /* contents ↔ copyright */
+  align-items: center;
+  padding: 24px 0;
+}
+.auth__contents {
+  flex: 1;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 40px;                                           /* top ↔ button */
+}
+.auth__top { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+.auth__logo { display: block; }
+.auth__logo svg { display: block; }
+.auth__inputs { align-self: stretch; display: flex; flex-direction: column; gap: 0; }
+.auth__inputs .text-input { border-radius: var(--radius-xs); }  /* 로그인 전용 예외 */
+.auth__actions { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.auth__actions .btn { width: 100%; }
+.auth__copyright { width: 240px; text-align: center; color: var(--text-subtle); }
+
+/* 실패 토스트 — §2 토스트 인터랙션 (실서비스 녹화 실측)
+   위치 top 16 · 내용 폭 · 스프링 등장 270ms · 2.5초 유지 · 위로 퇴장 35ms · 페이드 없음 */
+.toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 10;
+}
+.toast[hidden] { display: none; }
+.toast.is-entering { animation: toast-in 270ms linear both; }
+.toast.is-leaving  { animation: toast-out 35ms ease-in both; }
+
+@keyframes toast-in {
+  0%    { transform: translate(-50%, -72px); }
+  6.3%  { transform: translate(-50%, -24px); }
+  12.6% { transform: translate(-50%,   4px); }
+  18.5% { transform: translate(-50%,  20px); }
+  24.8% { transform: translate(-50%,  25px); }
+  31.1% { transform: translate(-50%,  13px); }
+  37%   { transform: translate(-50%,  -1px); }
+  43.3% { transform: translate(-50%,  -7px); }
+  49.6% { transform: translate(-50%, -10px); }
+  55.6% { transform: translate(-50%,  -8px); }
+  61.9% { transform: translate(-50%,  -1px); }
+  68.9% { transform: translate(-50%,   3px); }
+  74.8% { transform: translate(-50%,   5px); }
+  81.1% { transform: translate(-50%,   5px); }
+  87.4% { transform: translate(-50%,   2px); }
+  100%  { transform: translate(-50%,   0); }
+}
+@keyframes toast-out {
+  from { transform: translate(-50%, 0); }
+  to   { transform: translate(-50%, -72px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast.is-entering, .toast.is-leaving { animation: none; }
+}
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<main class="auth">
+  <form class="auth__contents" id="loginForm" novalidate>
+    <div class="auth__top">
+      <h1 class="auth__logo">
+        <span class="sr-only">PRADA</span>
+        <svg width="132" height="28" viewBox="0 0 132 28" fill="none" aria-hidden="true">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M12.0469 0C17.2783 0 22 3.47664 22 10.1484C21.9996 16.4538 17.2889 19.9727 12.0469 19.9727H5.31836V25.2461C5.31798 26.9995 4.18849 28 2.73438 28C1.41068 27.9996 0.000479557 26.9992 0 25.2461V2.76562L0.0117188 2.75391C0.0121917 1.44131 1.05334 0 2.74609 0H12.0469ZM5.31836 14.9688H12.0469C14.7494 14.9688 16.877 12.6117 16.877 10.1367C16.8769 7.33891 14.7385 5.02539 12.0469 5.02539H5.31836V14.9688Z" fill="#1B2A41"/>
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M90.1426 0C108.762 0.000175919 108.355 28 90.5039 28H80.8105C79.4712 28 78 27.2694 78 25.4922V2.50781C78 1.04678 79.4712 2.7824e-05 80.8105 0H90.1426ZM83.3691 23.0605H90.1309C101.131 23.0605 101.614 4.93945 90.1309 4.93945H83.3691V23.0605Z" fill="#1B2A41"/>
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M36.6445 0C46.4974 0.000680147 48.5141 13.7262 40.291 17.1523L45.4531 23.6895C47.4686 26.7997 43.4355 29.7795 41.1055 26.7129L35.2539 17.9902H29.1621V25.3086C29.1621 28.8216 24 28.9412 24 25.3848V2.45898C24 1.0451 25.0449 6.61141e-05 26.3301 0H36.6445ZM29.1621 13.3555H36.6445C41.6802 13.3546 41.9935 4.88359 36.6445 4.88281H29.1621V13.3555Z" fill="#1B2A41"/>
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M59.6465 1.62109C60.7105 -0.502451 63.5514 -0.577936 64.541 1.62109L75.6699 24.0645C77.2869 27.1798 72.5109 29.6691 71.0957 26.543L69.3613 23.0195H54.7949L53.0918 26.543C52.4641 27.9009 50.997 28.1824 49.582 27.9023C48.3162 27.1802 47.5274 25.746 48.3145 24.0645L59.6465 1.62109ZM57.252 17.7363H66.5625L62.1035 7.85156L57.252 17.7363Z" fill="#1B2A41"/>
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M115.646 1.62109C116.711 -0.502445 119.551 -0.577934 120.541 1.62109L131.67 24.0645C133.287 27.1798 128.511 29.6691 127.096 26.543L125.361 23.0195H110.795L109.092 26.543C108.464 27.9009 106.997 28.1824 105.582 27.9023C104.316 27.1802 103.527 25.746 104.314 24.0645L115.646 1.62109ZM113.252 17.7363H122.562L118.104 7.85156L113.252 17.7363Z" fill="#1B2A41"/>
+        </svg>
+      </h1>
+
+      <div class="auth__inputs">
+        <input class="text-input label-1-regular" id="userId" name="userId" type="text"
+               autocomplete="username" placeholder="아이디를 입력해 주세요." aria-label="아이디">
+        <input class="text-input label-1-regular" id="password" name="password" type="password"
+               autocomplete="current-password" placeholder="비밀번호를 입력해 주세요." aria-label="비밀번호">
+      </div>
+    </div>
+
+    <div class="auth__actions">
+      <label class="checkbox label-2-regular">
+        <input class="checkbox__input" type="checkbox" id="rememberId">
+        <span class="checkbox__box">
+          <svg width="14" height="14" viewBox="1 1 14 14" fill="none" aria-hidden="true">
+            <path d="M11.8043 4.80416C12.0229 4.58546 12.3772 4.58546 12.5959 4.80416C12.8146 5.02285 12.8146 5.37706 12.5959 5.59576L6.99586 11.1958C6.77716 11.4145 6.42295 11.4145 6.20425 11.1958L3.40425 8.39576C3.18556 8.17707 3.18556 7.82285 3.40425 7.60416C3.62295 7.38546 3.97716 7.38546 4.19586 7.60416L6.60006 10.0084L11.8043 4.80416Z" fill="white"/>
+          </svg>
+        </span>
+        아이디 기억하기
+      </label>
+      <button class="btn btn--lg btn--primary label-1-medium" type="submit">로그인</button>
+    </div>
+  </form>
+
+  <p class="auth__copyright label-2-regular">Copyright © PRADA. All rights reserved.</p>
+</main>
+
+<div class="toast alert label-1-regular" id="loginToast" role="alert" aria-live="assertive" hidden>
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12Z" fill="#FF6262"/>
+    <path d="M14.4356 8.43441C14.7481 8.12219 15.2542 8.12206 15.5665 8.43441C15.8789 8.74676 15.8787 9.25283 15.5665 9.56527L13.131 12.0008L15.5646 14.4344C15.877 14.7468 15.877 15.2528 15.5646 15.5652C15.2521 15.8776 14.7461 15.8776 14.4337 15.5652L12.0001 13.1316L9.5665 15.5652C9.25408 15.8776 8.74806 15.8776 8.43564 15.5652C8.12322 15.2528 8.12322 14.7468 8.43564 14.4344L10.8692 12.0008L8.43368 9.56527C8.12146 9.25283 8.12133 8.74676 8.43368 8.43441C8.74604 8.12206 9.25211 8.12219 9.56454 8.43441L12.0001 10.8699L14.4356 8.43441Z" fill="white"/>
+  </svg>
+  <span>아이디 또는 비밀번호가 일치하지 않습니다.</span>
+</div>
+
+<script>
+(() => {
+  const form = document.getElementById('loginForm');
+  const userId = document.getElementById('userId');
+  const rememberId = document.getElementById('rememberId');
+  const toast = document.getElementById('loginToast');
+  const STORAGE_KEY = 'prada.rememberedId';
+  const SESSION_KEY = 'prada.session';
+  // 백엔드가 없는 시안용 데모 계정 — role에 따라 공지사항 권한 화면이 달라진다.
+  const DEMO_ACCOUNTS = {
+    admin123: { password: 'prada1234', role: 'master' },
+    dist01: { password: 'prada1234', role: 'distributor' },
+    agency01: { password: 'prada1234', role: 'agency' },
+    adv01: { password: 'prada1234', role: 'advertiser' }
+  };
+  const TOAST_VISIBLE_MS = 2500;   // 등장 시작 ~ 퇴장 시작
+  const TOAST_EXIT_MS = 35;        // toast-out 길이
+  let hideTimer;
+  let removeTimer;
+
+  function showToast() {
+    clearTimeout(hideTimer);
+    clearTimeout(removeTimer);
+    toast.hidden = false;
+    toast.classList.remove('is-entering', 'is-leaving');
+    void toast.offsetWidth;          // 다시 실패해도 등장 애니메이션을 처음부터 재생
+    toast.classList.add('is-entering');
+    hideTimer = setTimeout(hideToast, TOAST_VISIBLE_MS);
+  }
+
+  function hideToast() {
+    toast.classList.remove('is-entering');
+    toast.classList.add('is-leaving');
+    // animationend 대신 타이머: 동작 줄이기(애니메이션 없음)에서도 확실히 숨긴다.
+    removeTimer = setTimeout(() => {
+      toast.classList.remove('is-leaving');
+      toast.hidden = true;
+    }, TOAST_EXIT_MS);
+  }
+
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) { userId.value = saved; rememberId.checked = true; }
+  } catch (e) {}
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    try {
+      if (rememberId.checked && userId.value) localStorage.setItem(STORAGE_KEY, userId.value);
+      else localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
+
+    const id = userId.value.trim();
+    const account = DEMO_ACCOUNTS[id];
+    if (!account || account.password !== document.getElementById('password').value) {
+      showToast();                   // Figma [Error Case] 로그인 실패 토스트
+      return;
+    }
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id, role: account.role })); } catch (e) {}
+    location.href = 'notice.html';
+  });
+})();
+</script>
+</body>
+</html>

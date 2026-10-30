@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRADA 계정관리</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="prada.css?v=20261030s">
+<style>
+/* =========================================================
+   4. 화면 — 계정관리 (목록 템플릿·컴포넌트는 prada.css)
+   ========================================================= */
+.acct-metric { margin-bottom: 16px; }                 /* 현황 카드 ↔ 검색 40 (view gap 24 + 16) */
+.acct-table .col-no { width: 80px; }
+.acct-table .col-140 { width: 140px; }
+.acct-table .col-icon { width: 56px; padding: 0 12px; }
+.acct-table td.col-icon { padding: 0 12px; line-height: 0; }   /* 높이 40 = 테두리 포함 */
+.acct-table td.col-memo { text-align: center; }
+
+/* Drawer 안 폼 (광고추가 · 계정등록 · 계정수정) */
+.acct-drawer .drawer__form .input-icon { flex: none; width: 100%; }
+
+/* 사용시간 설정 (Modal / Dialog 796 + Full Calendar) */
+/* 화면보다 긴 대화상자: 대화상자 대신 바깥(딤)이 스크롤 — 대화상자 안 스크롤바가 달력 폭을 줄이지 않게 */
+#usageModal { align-items: flex-start; overflow-y: auto; }
+.dialog--calendar { width: 796px; max-height: none; flex: none; margin: auto 0; }
+.fcal { display: flex; flex-direction: column; gap: 30px; }
+.fcal__head { display: flex; align-items: center; justify-content: space-between; height: 24px; }
+.fcal__month { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
+.fcal__nav { display: flex; gap: 5px; }
+.fcal__scroll { overflow-x: auto; }
+.fcal__grid { display: grid; grid-template-columns: repeat(7, 108px); width: 756px; }
+.fcal__wd {
+  height: 32px; padding-left: 8px; display: flex; align-items: center;
+  background: var(--bg-subtle); border: 1px solid var(--border-secondary); border-left: 0; color: var(--text-tertiary);
+}
+.fcal__wd:first-child { border-left: 1px solid var(--border-secondary); }
+.fcal__day {
+  position: relative; height: 108px; padding: 8px; display: flex; flex-direction: column; gap: 3px; text-align: left;
+  background: var(--bg-surface); border-right: 1px solid var(--border-secondary); border-bottom: 1px solid var(--border-secondary);
+  color: var(--text-primary); transition: background-color var(--motion-state), box-shadow var(--motion-state);
+}
+.fcal__day:nth-child(7n + 8) { border-left: 1px solid var(--border-secondary); }   /* 각 주 첫 칸 (요일 7칸 다음부터) */
+.fcal__day:not(:disabled):hover { background: var(--bg-subtle); }
+.fcal__day:disabled { background: var(--bg-disabled); color: var(--text-subtle); cursor: default; }   /* State=Outside */
+.fcal__day[aria-pressed="true"] { background: rgba(234, 242, 254, .3); box-shadow: inset 0 0 0 2px var(--border-select); color: var(--text-secondary); }   /* State=Selected */
+.fcal__day:focus-visible { outline: 2px solid var(--border-brand); outline-offset: -2px; }
+.fcal__date { width: 20px; height: 20px; text-align: center; }
+.fcal__events { display: flex; flex-direction: column; gap: 4px; }
+.fcal__event { height: 20px; padding: 2px 6px; border-radius: 4px; color: var(--text-inverse); text-align: center; white-space: nowrap; }   /* Calendar Event */
+.fcal__event--order { background: var(--badge-green); }
+.fcal__event--edit { background: var(--badge-blue); }
+.fcal__event--refund { background: var(--badge-red); }
+.fcal__times { display: flex; flex-direction: column; gap: 16px; }
+
+@media (max-width: 767px) {
+  .acct-metric { margin-bottom: 0; }
+  .dialog.dialog--calendar { width: 340px; padding: 40px 20px; }
+}
+</style>
+</head>
+<body data-prada-page="account.html">
+
+<div class="app-body">
+  <main class="main">
+    <div class="page-header">
+      <h1 class="heading-1-semibold">계정관리</h1>
+      <p class="page-header__desc label-1-regular">계정의 정보를 확인하고, 추가·수정·삭제 등의 관리 작업을 할 수 있습니다.</p>
+    </div>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+
+<!-- 광고추가 · 계정등록 · 계정수정 (Drawer / Size=368 · 모바일 Full) -->
+<div class="drawer acct-drawer" id="acctDrawer" hidden>
+  <form class="drawer__panel" id="acctForm" role="dialog" aria-modal="true" aria-labelledby="acctTitle" tabindex="-1" novalidate>
+    <h2 class="drawer__header body-1-semibold" id="acctTitle"></h2>
+    <div class="drawer__form" id="acctFields"></div>
+    <div class="cta">
+      <button class="btn btn--md btn--line" type="button" data-acct-close>닫기</button>
+      <button class="btn btn--md btn--primary" type="submit" id="acctSubmit"></button>
+    </div>
+  </form>
+</div>
+
+<!-- 사용시간 설정 (Modal / Dialog + Full Calendar) -->
+<div class="modal" id="usageModal" hidden>
+  <form class="dialog dialog--calendar" id="usageForm" role="dialog" aria-modal="true" aria-labelledby="usageTitle" tabindex="-1" novalidate>
+    <h2 class="dialog__header body-1-semibold" id="usageTitle">사용시간 설정</h2>
+    <div class="fcal">
+      <div class="fcal__head">
+        <div class="fcal__month">
+          <strong class="body-3-semibold" id="usageMonth" aria-live="polite"></strong>
+          <button class="btn btn--sm btn--line" type="button" id="usageSelectAll">날짜 전체 선택</button>
+        </div>
+        <div class="fcal__nav">
+          <button class="icon-btn icon-btn--line-sm" type="button" data-month="-1" aria-label="이전 달"><svg width="16" height="16"><use href="#i-prev"/></svg></button>
+          <button class="icon-btn icon-btn--line-sm" type="button" data-month="1" aria-label="다음 달"><svg width="16" height="16"><use href="#i-next"/></svg></button>
+        </div>
+      </div>
+      <div class="fcal__scroll"><div class="fcal__grid" id="usageGrid" role="group" aria-label="날짜 선택"></div></div>
+      <div class="fcal__times" id="usageTimes"></div>
+    </div>
+    <div class="cta">
+      <button class="btn btn--md btn--line" type="button" data-usage-close>취소</button>
+      <button class="btn btn--md btn--primary" type="submit">수정</button>
+    </div>
+    <button class="dialog__close" type="button" aria-label="닫기" data-usage-close><svg width="20" height="20"><use href="#i-close"/></svg></button>
+  </form>
+</div>
+
+<script src="prada.js?v=20261030s"></script>
+<script>
+(() => {
+  const { esc, icon, showToast, setInputError, clearInputError, syncScrollBtn,
+          mountSelect, checkbox, searchBarHTML, syncSearchClear, listNavHTML } = Prada;   // prada.js
+  const READ_ONLY = Prada.isAgency;   // 총판·대행사·광고주: 툴바(선택 개수·삭제·등록) 없음
+
+  /* ---------------- 데이터 (시안용 예시) ---------------- */
+  const ROLES = { admin: '관리자', distributor: '총판사', agency: '대행사', advertiser: '광고주' };
+  const ORGS = ['총판컴퍼니', '프라다미디어', '헤르메스애드', '블루마케팅'];
+  const IDS = ['asdf', 'prada', 'hermes', 'admin01', 'adflex', 'pullim', 'prime1234', 'lifetone12', 'our1', 'a123456'];
+  const ROLE_CYCLE = ['advertiser', 'agency', 'distributor', 'admin', 'advertiser', 'advertiser', 'agency', 'advertiser'];
+  let accounts = Array.from({ length: 34 }, (_, i) => ({
+    no: 33994 + i,
+    id: i < IDS.length ? IDS[i] : `${IDS[i % IDS.length]}${i}`,
+    pw: '123455',
+    role: ROLE_CYCLE[i % ROLE_CYCLE.length],
+    org: ORGS[i % ORGS.length],
+    qty: i % 5 === 4 ? 0 : 100,                          // 0개인 계정만 삭제 가능
+    memo: i % 3 === 0 ? '메모를 작성하는 영역입니다.' : ''
+  }));
+
+  const state = {
+    selected: new Set(), page: 1, pageSize: 10, field: 'all', query: '',
+    filters: { id: null, role: null, org: null },      // null = 전체
+    metric: 'all',                                     // 현황 카드에서 고른 항목: all | admin | agency | advertiser
+    sort: null                                         // null | 'desc' | 'asc' (수량)
+  };
+  const view = document.getElementById('view');
+  const today = () => { const d = new Date(); return fmt(d); };
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  /* ---------------- 목록 ---------------- */
+  function filtered() {
+    const q = state.query.trim().toLowerCase();
+    const f = state.filters;
+    let rows = accounts.filter((a) =>
+      (state.metric === 'all' || a.role === state.metric) &&
+      (!f.id || f.id.has(a.id)) && (!f.role || f.role.has(ROLES[a.role])) && (!f.org || f.org.has(a.org)) &&
+      (!q || (state.field !== 'org' && a.id.toLowerCase().includes(q)) || (state.field !== 'id' && a.org.toLowerCase().includes(q))));
+    if (state.sort) rows = [...rows].sort((a, b) => (state.sort === 'asc' ? a.qty - b.qty : b.qty - a.qty));
+    return rows;
+  }
+
+  function metricHTML() {
+    const count = (role) => accounts.filter((a) => a.role === role).length.toLocaleString();
+    // 항목을 누르면 표가 그 권한 계정으로 바뀐다. 고른 항목 = Metric Item Highlight=True (hover도 같은 파란색)
+    const item = (value, label, key) => `
+      <button class="metric__item ${state.metric === key ? 'metric__item--highlight' : ''}" type="button" data-metric="${key}" aria-pressed="${state.metric === key}" aria-label="${label} 계정 보기">
+        <strong class="metric__value title-semibold">${value}</strong>
+        <span class="metric__label body-3-regular">${label}</span>
+      </button>`;
+    return `
+      <section class="metric acct-metric" aria-labelledby="metricTitle">
+        <h2 class="metric__title heading-2-semibold" id="metricTitle">계정 현황</h2>
+        <div class="metric__items">
+          ${item(accounts.length.toLocaleString(), '전체', 'all')}<span class="metric__divider"></span>
+          ${item(count('admin'), '관리자', 'admin')}<span class="metric__divider"></span>
+          ${item(count('agency'), '대행사', 'agency')}<span class="metric__divider"></span>
+          ${item(count('advertiser'), '광고주', 'advertiser')}
+        </div>
+      </section>`;
+  }
+
+  const thFilter = (col, label) => `
+    <th class="col-140 col-th-btn">
+      <button class="th-btn ${state.filters[col] ? 'is-active' : ''}" type="button" data-filter-col="${col}" aria-haspopup="dialog">${label}${icon('i-filter', 12)}</button>
+    </th>`;
+
+  function renderList() {
+    const rows = filtered();
+    const totalPages = Math.max(1, Math.ceil(rows.length / state.pageSize));
+    state.page = Math.min(state.page, totalPages);
+    const pageRows = rows.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
+    const sortIcon = state.sort === 'asc' ? 'i-sort-asc' : state.sort === 'desc' ? 'i-sort-desc' : 'i-sort';
+    const ariaSort = state.sort === 'asc' ? 'ascending' : state.sort === 'desc' ? 'descending' : 'none';
+
+    view.innerHTML = `
+      ${metricHTML()}
+      ${searchBarHTML(state.query)}
+      <div class="list-block">
+        ${READ_ONLY ? '' : `
+        <div class="toolbar">
+          <p class="selected-count body-2-regular">${icon('i-check20')}<span><b>${state.selected.size}</b>개 선택됨</span></p>
+          <div class="btn-group">
+            <button class="btn btn--lg btn--line" type="button" id="usageBtn">사용시간 설정</button>
+            <button class="btn btn--lg btn--line" type="button" id="deleteBtn" ${state.selected.size ? '' : 'disabled'}>삭제</button>
+            <button class="btn btn--lg btn--primary" type="button" id="registerBtn">등록</button>
+          </div>
+        </div>`}
+        <div class="table-scroll">
+          <table class="table acct-table">
+            <thead><tr>
+              <th class="col-check">${checkbox('id="checkAll" aria-label="전체 선택"')}</th>
+              <th class="col-no">No</th>
+              ${thFilter('id', '아이디')}
+              <th class="col-140">비밀번호</th>
+              ${thFilter('role', '권한')}
+              ${thFilter('org', '소속')}
+              <th class="col-140 col-th-btn" aria-sort="${ariaSort}">
+                <button class="th-btn ${state.sort ? 'is-active' : ''}" type="button" data-sort="qty">수량${icon(sortIcon, 12)}</button>
+              </th>
+              <th class="col-icon">광고</th>
+              <th class="col-memo">메모</th>
+              <th class="col-icon">관리</th>
+            </tr></thead>
+            <tbody>
+              ${pageRows.length ? pageRows.map((a) => `
+                <tr data-no="${a.no}">
+                  <td class="col-check">${checkbox(`data-check="${a.no}" ${state.selected.has(a.no) ? 'checked' : ''} aria-label="${esc(a.id)} 선택"`)}</td>
+                  <td class="col-no">${a.no}</td>
+                  <td>${esc(a.id)}</td>
+                  <td>${esc(a.pw)}</td>
+                  <td><span class="role-badge role-badge--${a.role}">${ROLES[a.role]}</span></td>
+                  <td>${esc(a.org)}</td>
+                  <td>${a.qty.toLocaleString()}개</td>
+                  <td class="col-icon"><button class="cell-icon-btn" type="button" data-ad="${a.no}" aria-label="${esc(a.id)} 광고 추가">${icon('i-copy-plus')}</button></td>
+                  <td class="col-memo">${esc(a.memo)}</td>
+                  <td class="col-icon"><button class="cell-icon-btn" type="button" data-edit="${a.no}" aria-label="${esc(a.id)} 계정 수정">${icon('i-settings')}</button></td>
+                </tr>`).join('') : '<tr><td class="table__empty" colspan="10">검색 결과가 없습니다.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ${listNavHTML(state.page, totalPages)}`;
+
+    mountSelect(view.querySelector('[data-select="field"]'),
+      [{ value: 'all', label: '전체' }, { value: 'id', label: '아이디' }, { value: 'org', label: '소속' }],
+      state.field, (v) => { state.field = v; });
+    mountSelect(view.querySelector('[data-select="size"]'),
+      [10, 30, 50].map((n) => ({ value: String(n), label: `${n}개씩 보기` })),
+      String(state.pageSize), (v) => { state.pageSize = Number(v); state.page = 1; renderList(); });
+    syncCheckAll();
+    syncScrollBtn();
+  }
+
+  function syncCheckAll() {
+    const all = view.querySelector('#checkAll');
+    const boxes = [...view.querySelectorAll('[data-check]')];
+    const n = boxes.filter((b) => b.checked).length;
+    all.checked = boxes.length > 0 && n === boxes.length;
+    all.indeterminate = n > 0 && n < boxes.length;
+    const count = view.querySelector('.selected-count b');
+    if (count) count.textContent = state.selected.size;
+    const del = view.querySelector('#deleteBtn');   // 선택된 계정이 있을 때만 활성 (Button Status=Disabled)
+    if (del) del.disabled = !state.selected.size;
+  }
+
+  view.addEventListener('change', (e) => {
+    if (e.target.id === 'checkAll') {
+      view.querySelectorAll('[data-check]').forEach((b) => {
+        b.checked = e.target.checked;
+        const no = Number(b.dataset.check);
+        e.target.checked ? state.selected.add(no) : state.selected.delete(no);
+      });
+      syncCheckAll();
+    } else if (e.target.dataset.check) {
+      const no = Number(e.target.dataset.check);
+      e.target.checked ? state.selected.add(no) : state.selected.delete(no);
+      syncCheckAll();
+    }
+  });
+
+  view.addEventListener('click', (e) => {
+    if (e.target.closest('#searchClear')) {
+      view.querySelector('#searchInput').value = '';
+      if (state.query) { state.query = ''; state.page = 1; renderList(); } else syncSearchClear();
+      view.querySelector('#searchInput').focus();
+      return;
+    }
+    const pageBtn = e.target.closest('.pagination [data-page]');
+    if (pageBtn && !pageBtn.disabled) { state.page = Number(pageBtn.dataset.page); renderList(); return; }
+
+    const metric = e.target.closest('[data-metric]');
+    if (metric) {
+      state.metric = metric.dataset.metric;
+      state.page = 1;
+      renderList();
+      view.querySelector(`[data-metric="${state.metric}"]`).focus({ preventScroll: true });
+      return;
+    }
+    const filterBtn = e.target.closest('[data-filter-col]');
+    if (filterBtn) {
+      const col = filterBtn.dataset.filterCol;
+      const values = [...new Set(accounts.map((a) => (col === 'role' ? ROLES[a.role] : a[col])))];
+      Prada.filterPopover(filterBtn, {
+        options: values,
+        selected: state.filters[col],
+        onApply: (set) => { state.filters[col] = set; state.page = 1; renderList(); }
+      });
+      return;
+    }
+    if (e.target.closest('[data-sort]')) {
+      state.sort = state.sort === null ? 'desc' : state.sort === 'desc' ? 'asc' : null;
+      renderList();
+      view.querySelector('[data-sort]').focus();
+      return;
+    }
+    const ad = e.target.closest('[data-ad]');
+    if (ad) { openDrawer('ad', Number(ad.dataset.ad)); return; }
+    const edit = e.target.closest('[data-edit]');
+    if (edit) { openDrawer('edit', Number(edit.dataset.edit)); return; }
+    if (e.target.closest('#registerBtn')) { openDrawer('register'); return; }
+    if (e.target.closest('#deleteBtn')) deleteSelected();
+  });
+
+  view.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (e.target.id === 'searchForm') {
+      state.query = view.querySelector('#searchInput').value; state.page = 1; renderList();
+    } else if (e.target.id === 'gotoForm') {
+      const total = Math.max(1, Math.ceil(filtered().length / state.pageSize));
+      const p = parseInt(view.querySelector('#gotoInput').value, 10);
+      state.page = Number.isFinite(p) ? Math.min(Math.max(p, 1), total) : state.page;
+      renderList();
+    }
+  });
+
+  /* ---------------- 삭제 (오류 2종 + 확인) ---------------- */
+  async function deleteSelected() {
+    if (!state.selected.size) { showToast('error', '계정을 선택해주세요.'); return; }
+    const targets = accounts.filter((a) => state.selected.has(a.no));
+    if (targets.some((a) => a.qty > 0)) { showToast('error', '광고가 남아있는 계정은 삭제할 수 없습니다.'); return; }
+    if (!(await Prada.confirm({ title: '선택하신 계정을 삭제하시겠습니까?', message: '삭제 후 복구는 불가능합니다.' }))) return;
+    accounts = accounts.filter((a) => !state.selected.has(a.no));
+    state.selected.clear();
+    renderList();
+    showToast('success', '계정 삭제가 완료되었습니다.');
+  }
+
+  /* ---------------- Drawer: 광고추가 · 계정등록 · 계정수정 ---------------- */
+  const drawer = document.getElementById('acctDrawer');
+  const form = document.getElementById('acctForm');
+  const fields = document.getElementById('acctFields');
+  let mode = null;
+  let target = null;
+
+  const field = (label, control, required = false) => `
+    <label class="field">
+      <span class="field__label label-1-regular">${label}${required ? '<span class="field__req label-1-medium" aria-hidden="true">*</span>' : ''}</span>
+      ${control}
+    </label>`;
+  const input = (name, { value = '', placeholder = '', disabled = false, type = 'text', inputmode = '' } = {}) =>
+    `<input class="text-input label-1-regular" id="af-${name}" name="${name}" type="${type}" value="${esc(value)}" placeholder="${esc(placeholder)}" ${inputmode ? `inputmode="${inputmode}"` : ''} ${disabled ? 'disabled' : ''}>`;
+
+  const DRAWERS = {
+    ad: {
+      title: '광고추가', submit: '추가',
+      body: (a) => `
+        ${field('아이디', input('id', { value: a.id, disabled: true }))}
+        <div class="field">
+          <span class="field__label label-1-regular" id="af-pay-label">결제<span class="field__req label-1-medium" aria-hidden="true">*</span></span>
+          <div class="segmented" role="radiogroup" aria-labelledby="af-pay-label">
+            <button class="segmented__item" type="button" role="radio" aria-checked="true" data-pay="결제">결제</button>
+            <button class="segmented__item" type="button" role="radio" aria-checked="false" data-pay="테스트">테스트</button>
+          </div>
+        </div>
+        ${field('수량', input('qty', { placeholder: '수량을 입력해주세요.', inputmode: 'numeric' }), true)}
+        ${field('일수', input('days', { placeholder: '일수를 입력해주세요.', inputmode: 'numeric' }), true)}
+        <label class="field">
+          <span class="field__label label-1-regular">작업 시작일<span class="field__req label-1-medium" aria-hidden="true">*</span></span>
+          <span class="input-icon">
+            ${input('start', { value: today(), placeholder: '연도-월-일' })}
+            <button class="input-icon__btn" type="button" data-pick aria-label="달력 열기">${icon('i-calendar')}</button>
+            <input class="input-icon__native" type="date" tabindex="-1" aria-hidden="true" data-native>
+          </span>
+        </label>
+        ${field('작업 종료일', input('end', { disabled: true }))}`
+    },
+    register: {
+      title: '계정등록', submit: '등록',
+      body: () => `
+        ${field('아이디', input('id', { placeholder: '아이디를 입력해주세요.' }), true)}
+        ${field('비밀번호', input('pw', { type: 'password', placeholder: '비밀번호를 입력해주세요.' }), true)}
+        ${field('권한', input('role', { value: ROLES.distributor, disabled: true }), true)}
+        ${field('소속', input('org', { placeholder: '회사명을 입력해주세요.' }), true)}
+        ${field('메모', '<textarea class="text-area label-1-regular" id="af-memo" name="memo" placeholder="내용을 입력해주세요."></textarea>')}`
+    },
+    edit: {
+      title: '계정수정', submit: '수정',
+      body: (a) => `
+        ${field('아이디', input('id', { value: a.id, disabled: true }), true)}
+        ${field('비밀번호', input('pw', { type: 'password', placeholder: '비밀번호를 입력해주세요.' }), true)}
+        ${field('권한', input('role', { value: ROLES[a.role], disabled: true }), true)}
+        ${field('메모', `<textarea class="text-area label-1-regular" id="af-memo" name="memo" placeholder="내용을 입력해주세요.">${esc(a.memo)}</textarea>`)}`
+    }
+  };
+
+  function openDrawer(m, no) {
+    mode = m;
+    target = no ? accounts.find((a) => a.no === no) : null;
+    const d = DRAWERS[m];
+    document.getElementById('acctTitle').textContent = d.title;
+    document.getElementById('acctSubmit').textContent = d.submit;
+    fields.innerHTML = d.body(target);
+    if (m === 'ad') syncEndDate();
+    drawer.hidden = false;
+    form.focus();
+  }
+  function closeDrawer() { drawer.hidden = true; }
+
+  // 작업 종료일 = 시작일 + 일수 - 1 (자동 계산, 수정 불가)
+  function syncEndDate() {
+    const start = form.start.value;
+    const days = parseInt(form.days.value, 10);
+    const d = new Date(`${start}T00:00:00`);
+    form.end.value = /^\d{4}-\d{2}-\d{2}$/.test(start) && !Number.isNaN(d.getTime()) && days > 0
+      ? fmt(new Date(d.getFullYear(), d.getMonth(), d.getDate() + days - 1)) : '';
+  }
+
+  drawer.addEventListener('click', (e) => {
+    if (e.target === drawer || e.target.closest('[data-acct-close]')) { closeDrawer(); return; }
+    const pay = e.target.closest('[data-pay]');
+    if (pay) fields.querySelectorAll('[data-pay]').forEach((b) => b.setAttribute('aria-checked', String(b === pay)));
+    if (e.target.closest('[data-pick]')) {
+      const native = fields.querySelector('[data-native]');
+      native.value = form.start.value || '';
+      try { native.showPicker(); } catch (err) { native.focus(); native.click(); }
+    }
+  });
+  fields.addEventListener('change', (e) => {
+    if (e.target.matches('[data-native]')) { form.start.value = e.target.value; clearInputError(form.start); syncEndDate(); }
+  });
+  fields.addEventListener('input', (e) => {
+    if (e.target.matches('.text-input, .text-area')) clearInputError(e.target);
+    if (mode === 'ad' && (e.target.name === 'days' || e.target.name === 'start')) syncEndDate();
+  });
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const val = (n) => (form[n] ? form[n].value.trim() : '');
+    const errors = [];
+    const need = (n, msg, ok = !!val(n)) => { if (!ok) { setInputError(form[n], msg); errors.push(form[n]); } };
+
+    if (mode === 'ad') {
+      need('qty', '수량을 입력해주세요.', /^\d+$/.test(val('qty')) && Number(val('qty')) > 0);
+      need('days', '일수를 입력해주세요.', /^\d+$/.test(val('days')) && Number(val('days')) > 0);
+      need('start', '작업 시작일을 선택해주세요.', /^\d{4}-\d{2}-\d{2}$/.test(val('start')));
+    } else if (mode === 'register') {
+      need('id', '아이디를 입력해주세요.');
+      if (val('id') && accounts.some((a) => a.id === val('id'))) { setInputError(form.id, '이미 사용 중인 아이디입니다.'); errors.push(form.id); }
+      need('pw', '비밀번호를 입력해주세요.');
+      need('org', '회사명을 입력해주세요.');
+    } else if (mode === 'edit') {
+      need('pw', '비밀번호를 입력해주세요.');
+    }
+    if (errors.length) { errors[0].focus(); return; }
+
+    if (mode === 'ad') {
+      target.qty += Number(val('qty'));
+      showToast('success', '광고 추가가 완료되었습니다.');
+    } else if (mode === 'register') {
+      const no = Math.max(0, ...accounts.map((a) => a.no)) + 1;
+      accounts.unshift({ no, id: val('id'), pw: val('pw'), role: 'distributor', org: val('org'), qty: 0, memo: val('memo') });
+      state.page = 1;
+      showToast('success', '계정 등록이 완료되었습니다.');
+    } else if (mode === 'edit') {
+      target.pw = val('pw');
+      target.memo = val('memo');
+      showToast('success', '계정 수정이 완료되었습니다.');
+    }
+    closeDrawer();
+    renderList();
+  });
+
+  /* ---------------- 사용시간 설정 (Full Calendar) ---------------- */
+  const usageModal = document.getElementById('usageModal');
+  const usageForm = document.getElementById('usageForm');
+  const usageGrid = document.getElementById('usageGrid');
+  const TIME_TYPES = [['order', '발주 시간'], ['edit', '수정 시간'], ['refund', '환불 시간']];
+  const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  const key = (d) => fmt(d);
+  // 시안용 예시: 이번 달 8·11·17·18일
+  const schedule = {};
+  (() => {
+    const t = new Date();
+    [8, 11, 17, 18].forEach((day) => {
+      schedule[key(new Date(t.getFullYear(), t.getMonth(), day))] = { order: ['00:00', '18:30'], edit: ['00:00', '23:59'], refund: ['00:00', '18:00'] };
+    });
+  })();
+  let viewMonth = new Date();
+  let picked = new Set();
+
+  document.getElementById('usageTimes').innerHTML = TIME_TYPES.map(([type, label]) => `
+    <div class="field">
+      <span class="field__label label-1-regular" id="ut-${type}-label">${label}</span>
+      <div class="time-range" role="group" aria-labelledby="ut-${type}-label">
+        <div>${`<input class="text-input label-1-regular" id="ut-${type}-from" name="${type}From" value="00:00" placeholder="00:00" inputmode="numeric" maxlength="5" aria-label="${label} 시작">`}</div>
+        <span class="time-range__tilde label-1-regular">~</span>
+        <div>${`<input class="text-input label-1-regular" id="ut-${type}-to" name="${type}To" value="23:50" placeholder="00:00" inputmode="numeric" maxlength="5" aria-label="${label} 종료">`}</div>
+      </div>
+    </div>`).join('');
+
+  function renderCalendar() {
+    const y = viewMonth.getFullYear();
+    const m = viewMonth.getMonth();
+    document.getElementById('usageMonth').textContent = `${y}년 ${m + 1}월`;
+    const first = new Date(y, m, 1);
+    const start = new Date(y, m, 1 - ((first.getDay() + 6) % 7));   // 월요일 시작
+    const last = new Date(y, m + 1, 0);
+    const weeks = Math.ceil((((first.getDay() + 6) % 7) + last.getDate()) / 7);
+    const days = Array.from({ length: weeks * 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+    const chip = (type, [from, to]) => `<span class="fcal__event fcal__event--${type} label-2-regular">${from} ~ ${to}</span>`;
+    usageGrid.innerHTML = WEEKDAYS.map((w) => `<span class="fcal__wd label-1-regular">${w}</span>`).join('') + days.map((d) => {
+      const inMonth = d.getMonth() === m;
+      const k = key(d);
+      const s = schedule[k];
+      return `<button class="fcal__day" type="button" data-day="${k}" ${inMonth ? `aria-pressed="${picked.has(k)}"` : 'disabled'} aria-label="${d.getMonth() + 1}월 ${d.getDate()}일">
+        <span class="fcal__date label-1-regular">${d.getDate()}</span>
+        ${inMonth && s ? `<span class="fcal__events">${chip('order', s.order)}${chip('edit', s.edit)}${chip('refund', s.refund)}</span>` : ''}
+      </button>`;
+    }).join('');
+  }
+  function monthKeys() {
+    const y = viewMonth.getFullYear(); const m = viewMonth.getMonth();
+    return Array.from({ length: new Date(y, m + 1, 0).getDate() }, (_, i) => key(new Date(y, m, i + 1)));
+  }
+  function openUsage() {
+    viewMonth = new Date();
+    picked = new Set();
+    usageForm.querySelectorAll('.text-input').forEach(clearInputError);
+    renderCalendar();
+    usageModal.hidden = false;
+    usageModal.scrollTop = 0;
+    usageForm.focus({ preventScroll: true });   // 긴 대화상자: 위 여백 40 유지
+  }
+  function closeUsage() { usageModal.hidden = true; }
+
+  view.addEventListener('click', (e) => { if (e.target.closest('#usageBtn')) openUsage(); });
+  usageModal.addEventListener('click', (e) => {
+    if (e.target === usageModal || e.target.closest('[data-usage-close]')) { closeUsage(); return; }
+    const day = e.target.closest('[data-day]');
+    if (day && !day.disabled) {
+      const k = day.dataset.day;
+      picked.has(k) ? picked.delete(k) : picked.add(k);
+      day.setAttribute('aria-pressed', String(picked.has(k)));
+      return;
+    }
+    const nav = e.target.closest('[data-month]');
+    if (nav) { viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + Number(nav.dataset.month), 1); renderCalendar(); return; }
+    if (e.target.closest('#usageSelectAll')) {
+      const keys = monthKeys();
+      const all = keys.every((k) => picked.has(k));
+      keys.forEach((k) => (all ? picked.delete(k) : picked.add(k)));   // 모두 선택돼 있으면 해제
+      renderCalendar();
+    }
+  });
+  usageForm.addEventListener('input', (e) => { if (e.target.matches('.text-input')) clearInputError(e.target); });
+  usageForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+    let firstError = null;
+    const values = {};
+    TIME_TYPES.forEach(([type]) => {
+      const from = usageForm[`${type}From`];
+      const to = usageForm[`${type}To`];
+      [from, to].forEach((el) => {
+        if (!TIME.test(el.value.trim())) { setInputError(el, '00:00 형식으로 입력해주세요.'); firstError = firstError || el; }
+      });
+      if (TIME.test(from.value.trim()) && TIME.test(to.value.trim()) && from.value.trim() >= to.value.trim()) {
+        setInputError(to, '시작 시간보다 늦게 입력해주세요.'); firstError = firstError || to;
+      }
+      values[type] = [from.value.trim(), to.value.trim()];
+    });
+    if (firstError) { firstError.focus(); return; }
+    if (!picked.size) { showToast('error', '날짜를 선택해주세요.'); return; }
+    picked.forEach((k) => { schedule[k] = { ...values }; });
+    closeUsage();
+    showToast('success', '사용시간 설정이 완료되었습니다.');
+  });
+
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDrawer(); closeUsage(); } });
+
+  renderList();
+  view.classList.add('is-entering');   // 화면 진입 페이드
+})();
+</script>
+</body>
+</html>

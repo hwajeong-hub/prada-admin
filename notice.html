@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRADA 공지사항</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="prada.css?v=20261030s">
+<style>
+/* =========================================================
+   4. 화면 — 공지사항 상세 · 작성 (목록 템플릿은 prada.css)
+   ========================================================= */
+/* 카드 외곽선 = Figma inside stroke → outline -1px (자식 레이아웃을 밀지 않음) */
+.detail { background: var(--bg-surface); outline: 1px solid var(--border-disabled); outline-offset: -1px; }
+.detail__header { display: flex; align-items: center; justify-content: space-between; gap: 45px; min-height: 54px; padding: 0 20px; border-bottom: 1px solid var(--border-secondary); }
+.detail__title { color: var(--text-secondary); }
+.detail__date { color: var(--text-subtle); white-space: nowrap; }
+.detail__body { padding: 20px; color: var(--text-secondary); white-space: pre-line; word-break: keep-all; overflow-wrap: anywhere; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.form { background: var(--bg-surface); outline: 1px solid var(--border-secondary); outline-offset: -1px; }
+.form__row { display: flex; }
+.form__label {
+  display: flex; align-items: center; justify-content: center; flex: none; width: 150px;
+  background: var(--bg-table-header); border-right: 1px solid var(--border-secondary); border-bottom: 1px solid var(--border-secondary);
+  color: var(--text-secondary); text-align: center;
+}
+.form__cell { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 20px 20px 19px; border-bottom: 1px solid var(--border-tertiary); }
+.form__row:last-child .form__label, .form__row:last-child .form__cell { border-bottom: 0; }
+.form__row:last-child .form__cell { padding-bottom: 20px; }
+.form__cell--options { gap: 30px; padding: 12px 20px; min-height: 64px; }
+.form__tilde { color: var(--text-tertiary); flex: none; }
+.form .text-area { height: 400px; padding: 15px; color: var(--text-secondary); }   /* 화면 시안: 내용 칸 패딩 16, Text/Secondary */
+.form__cell:has(> .input-msg) { flex-direction: column; align-items: stretch; gap: 4px; }
+.form__cell > .input-msg { margin-top: 0; }
+
+/* =========================================================
+   5. 모바일 (360 기준) — §3.3
+   ========================================================= */
+@media (max-width: 767px) {
+  .detail__header { flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; padding: 16px 20px 15px; }
+  .actions .btn { flex: 1; }
+
+  .form { background: none; outline: 0; display: flex; flex-direction: column; gap: 24px; }
+  .form__row { flex-direction: column; gap: 12px; }
+  .form__label { width: auto; justify-content: flex-start; background: none; border: 0; text-align: left; }
+  .form__cell, .form__cell--options, .form__row:last-child .form__cell { padding: 0; border: 0; min-height: 0; }
+  .form__cell--options { gap: 30px; }
+  .form .text-area { height: 320px; }
+}
+</style>
+</head>
+<body data-prada-page="notice.html">
+
+<div class="app-body">
+  <main class="main">
+    <div class="page-header">
+      <h1 class="heading-1-semibold">공지사항</h1>
+      <p class="page-header__desc label-1-regular">새로운 소식, 업데이트 관련 정보를 한 곳에서 확인할 수 있습니다.</p>
+    </div>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+
+<!-- 첫 진입 팝업 (Modal / Dialog) -->
+<div class="modal" id="popupModal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="popupTitle" tabindex="-1">
+    <article class="article">
+      <h2 class="body-1-semibold" id="popupTitle"></h2>
+      <p class="article__meta label-1-regular" id="popupMeta"></p>
+      <div class="article__divider"></div>
+      <p class="article__body body-3-regular" id="popupBody"></p>
+    </article>
+    <div class="cta">
+      <button class="btn btn--md btn--line" type="button" id="popupNever">다시 보지 않기</button>
+      <button class="btn btn--md btn--primary" type="button" id="popupClose">닫기</button>
+    </div>
+    <button class="dialog__close" type="button" aria-label="닫기" data-close-popup><svg width="20" height="20"><use href="#i-close"/></svg></button>
+  </div>
+</div>
+
+
+<script src="prada.js?v=20261030s"></script>
+<script>
+(() => {
+  /* ---------------- 데이터 ---------------- */
+  const { esc, icon, showToast, setInputError, clearInputError, syncScrollBtn,
+          mountSelect, checkbox, searchBarHTML, syncSearchClear, listNavHTML } = Prada;   // prada.js
+  const READ_ONLY = Prada.isAgency;                                                         // 총판·대행사·일반
+  const LONG_BODY = `안녕하세요. 관리자입니다.
+
+헤르메스는 복합 매체사에서 리워드 광고를 진행할 때 필요한 캠페인 정보를 자동으로 수집하고,
+상품별 순위 추적 및 키워드 관리 등 다양한 편의 기능을 제공하는 UI입니다.
+
+네이버쇼핑 탭에서 순위 반영이 이루어지는 유입 경로로 유도하며,
+유저가 상품을 방문하고 체류 시간을 확보할 수 있도록 강제함으로써, 실제 유저에게 리워드 보상을 지급합니다.
+
+* 헤르메스 정보
+- 슬롯당 약 120유입
+
+
+- 슬롯당 노출수 150~450 노출
+- 슬롯당 클릭수 10~40 클릭
+=> 노출수와 클릭수는 변경되는 로직 또는 네이버 로직 변경에 따라 추후 바뀔 수 있습니다.
+
+- type A 선택시 10위 이내 키워드 필수입력 1개 / 추가 선택입력 2개 [수정되는 로직에따라 변동]
+- type B 선택시 3위 이내 키워드 필수입력 1개 / 추가 선택입력 2개 [수정되는 로직에따라 변동]
+=> 입력하는 작업 키워드는 로직 변경에 따라 추후 수정될 수 있습니다.
+
+- 일할발주 및 시작일 설정가능 -> 당일 구동은 불가능합니다.
+- A/S 불가
+- 환불요청 시 잔여일수 환불
+- 평일 18시 / 주말 및 공휴일 17시 발주 및 환불 업무 마감
+
+발주 및 환불에 대한 업무 마감 시간을 꼭 지켜주시길 바라며
+사용하시는 데 불편함이 없도록 꾸준히 업데이트 하도록 하겠습니다.
+사용해주셔서 정말 감사합니다!`;
+
+  let notices = [
+    { no: 33994, title: '헤르메스 구동 방법 안내드립니다.', date: '2025-06-12', pinned: true, popup: true, popupFrom: '2025-06-12', popupTo: '2025-07-10', views: 128, body: LONG_BODY },
+    ...Array.from({ length: 9 }, (_, i) => ({
+      no: 33993 - i, title: '헤르메스 구동 방법 안내드립니다.', date: '2025-06-12',
+      pinned: false, popup: false, popupFrom: '', popupTo: '', views: 0, body: LONG_BODY
+    }))
+  ];
+
+  const state = { selected: new Set(), page: 1, pageSize: 50, field: 'all', query: '' };
+  const view = document.getElementById('view');
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const isMobile = () => matchMedia('(max-width: 767px)').matches;
+
+  /* ---------------- 목록 ---------------- */
+  function filtered() {
+    const q = state.query.trim().toLowerCase();
+    return notices
+      .filter((n) => !q || (state.field !== 'body' && n.title.toLowerCase().includes(q)) || (state.field !== 'title' && n.body.toLowerCase().includes(q)))
+      .sort((a, b) => (b.pinned - a.pinned) || (b.no - a.no));
+  }
+
+  function renderList() {
+    const rows = filtered();
+    const totalPages = Math.max(1, Math.ceil(rows.length / state.pageSize));
+    state.page = Math.min(state.page, totalPages);
+    const pageRows = rows.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
+    const colCount = READ_ONLY ? 3 : 4;
+
+    view.innerHTML = `
+      ${searchBarHTML(state.query)}
+      <div class="list-block">
+        ${READ_ONLY ? '' : `
+        <div class="toolbar">
+          <p class="selected-count body-2-regular">${icon('i-check20')}<span><b>${state.selected.size}</b>개 선택됨</span></p>
+          <div class="btn-group">
+            <button class="btn btn--lg btn--line" type="button" id="deleteBtn">삭제</button>
+            <a class="btn btn--lg btn--primary" href="#/write">작성</a>
+          </div>
+        </div>`}
+        <div class="table-scroll">
+          <table class="table">
+            <thead><tr>
+              ${READ_ONLY ? '' : `<th class="col-check">${checkbox('id="checkAll" aria-label="전체 선택"')}</th>`}
+              <th class="col-no">No</th><th class="col-title">제목</th><th class="col-date">작성일자</th>
+            </tr></thead>
+            <tbody>
+              ${pageRows.length ? pageRows.map((n) => `
+                <tr class="is-link ${n.pinned ? 'is-pinned' : ''}" data-no="${n.no}">
+                  ${READ_ONLY ? '' : `<td class="col-check">${checkbox(`data-check="${n.no}" ${state.selected.has(n.no) ? 'checked' : ''} aria-label="${n.no} 선택"`)}</td>`}
+                  <td class="col-no">${n.no}</td>
+                  <td class="col-title">${esc(n.title)}</td>
+                  <td class="col-date">${n.date}</td>
+                </tr>`).join('') : `<tr><td class="table__empty" colspan="${colCount}">검색 결과가 없습니다.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ${listNavHTML(state.page, totalPages)}`;
+
+    mountSelect(view.querySelector('[data-select="field"]'),
+      [{ value: 'all', label: '전체' }, { value: 'title', label: '제목' }, { value: 'body', label: '내용' }],
+      state.field, (v) => { state.field = v; });
+    mountSelect(view.querySelector('[data-select="size"]'),
+      [10, 30, 50].map((n) => ({ value: String(n), label: `${n}개씩 보기` })),
+      String(state.pageSize), (v) => { state.pageSize = Number(v); state.page = 1; renderList(); });
+
+    syncCheckAll();
+    maybeShowPopup();
+  }
+
+  function syncCheckAll() {
+    const all = view.querySelector('#checkAll');
+    if (!all) return;
+    const boxes = [...view.querySelectorAll('[data-check]')];
+    const n = boxes.filter((b) => b.checked).length;
+    all.checked = boxes.length > 0 && n === boxes.length;
+    all.indeterminate = n > 0 && n < boxes.length;
+    const count = view.querySelector('.selected-count b');
+    if (count) count.textContent = state.selected.size;
+  }
+
+  view.addEventListener('change', (e) => {
+    if (e.target.id === 'checkAll') {
+      view.querySelectorAll('[data-check]').forEach((b) => {
+        b.checked = e.target.checked;
+        const no = Number(b.dataset.check);
+        e.target.checked ? state.selected.add(no) : state.selected.delete(no);
+      });
+      syncCheckAll();
+    } else if (e.target.dataset.check) {
+      const no = Number(e.target.dataset.check);
+      e.target.checked ? state.selected.add(no) : state.selected.delete(no);
+      syncCheckAll();
+    }
+  });
+
+  view.addEventListener('click', (e) => {
+    if (e.target.closest('#searchClear')) {
+      const input = view.querySelector('#searchInput');
+      input.value = '';
+      if (state.query) { state.query = ''; state.page = 1; renderList(); }
+      else syncSearchClear();
+      view.querySelector('#searchInput').focus();
+      return;
+    }
+    const pageBtn = e.target.closest('[data-page]');
+    if (pageBtn && !pageBtn.disabled) { state.page = Number(pageBtn.dataset.page); renderList(); return; }
+    if (e.target.closest('#deleteBtn')) {
+      if (!state.selected.size) { showToast('error', '선택된 항목이 없습니다.'); return; }
+      confirmDelete([...state.selected]);
+      return;
+    }
+    const row = e.target.closest('tr[data-no]');
+    if (row && !e.target.closest('.cb')) location.hash = `#/notice/${row.dataset.no}`;
+  });
+
+  view.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (e.target.id === 'searchForm') {
+      state.query = view.querySelector('#searchInput').value; state.page = 1; renderList();
+    } else if (e.target.id === 'gotoForm') {
+      const total = Math.max(1, Math.ceil(filtered().length / state.pageSize));
+      const p = parseInt(view.querySelector('#gotoInput').value, 10);
+      state.page = Number.isFinite(p) ? Math.min(Math.max(p, 1), total) : state.page;
+      renderList();
+    } else if (e.target.id === 'noticeForm') {
+      saveForm(e.target);
+    }
+  });
+
+  /* ---------------- 상세 ---------------- */
+  function renderDetail(no) {
+    const n = notices.find((x) => x.no === no);
+    if (!n) { location.hash = '#/'; return; }
+    view.innerHTML = `
+      <article class="detail">
+        <header class="detail__header">
+          <h2 class="detail__title body-1-semibold">${esc(n.title)}</h2>
+          <span class="detail__date label-1-regular">${n.date}</span>
+        </header>
+        <div class="detail__body label-1-regular">${esc(n.body)}</div>
+      </article>
+      <div class="actions">
+        <a class="btn btn--lg btn--line" href="#/">목록</a>
+        ${READ_ONLY ? '' : `
+        <button class="btn btn--lg btn--line" type="button" data-detail-delete="${n.no}">삭제</button>
+        <a class="btn btn--lg btn--primary" href="#/edit/${n.no}">수정</a>`}
+      </div>`;
+    view.querySelector('[data-detail-delete]')?.addEventListener('click', () => confirmDelete([n.no]));
+  }
+
+  /* ---------------- 작성 / 수정 ---------------- */
+  function dateField(name, value) {
+    return `
+      <div class="input-icon">
+        <input class="text-input" name="${name}" placeholder="연도-월-일" value="${esc(value)}" pattern="\\d{4}-\\d{2}-\\d{2}" aria-label="${name === 'popupFrom' ? '팝업 시작일' : '팝업 종료일'}">
+        <button class="input-icon__btn" type="button" data-pick="${name}" aria-label="달력 열기">${icon('i-calendar')}</button>
+        <input class="input-icon__native" type="date" tabindex="-1" aria-hidden="true" data-native="${name}">
+      </div>`;
+  }
+
+  function renderForm(no) {
+    if (READ_ONLY) { location.hash = '#/'; return; }
+    const n = no ? notices.find((x) => x.no === no) : { title: '', body: '', pinned: false, popup: false, popupFrom: '', popupTo: '' };
+    if (!n) { location.hash = '#/'; return; }
+    view.innerHTML = `
+      <form id="noticeForm" data-no="${no || ''}" novalidate style="display:flex;flex-direction:column;gap:24px">
+        <div class="form">
+          <div class="form__row">
+            <div class="form__label label-1-regular">등록 옵션</div>
+            <div class="form__cell form__cell--options">
+              ${checkbox(`name="pinned" ${n.pinned ? 'checked' : ''}`, '상단 고정', 'label-2-regular')}
+              ${checkbox(`name="popup" ${n.popup ? 'checked' : ''}`, '팝업', 'label-2-regular')}
+            </div>
+          </div>
+          <div class="form__row">
+            <div class="form__label label-1-regular">팝업 기간 설정</div>
+            <div class="form__cell">
+              ${dateField('popupFrom', n.popupFrom)}
+              <span class="form__tilde label-1-regular">~</span>
+              ${dateField('popupTo', n.popupTo)}
+            </div>
+          </div>
+          <div class="form__row">
+            <label class="form__label label-1-regular" for="fTitle">제목</label>
+            <div class="form__cell"><input class="text-input" id="fTitle" name="title" placeholder="제목을 입력해 주세요." value="${esc(n.title)}"></div>
+          </div>
+          <div class="form__row">
+            <label class="form__label label-1-regular" for="fBody">내용</label>
+            <div class="form__cell"><textarea class="text-area" id="fBody" name="body" placeholder="내용을 입력해 주세요.">${esc(n.body)}</textarea></div>
+          </div>
+        </div>
+        <div class="actions">
+          <a class="btn btn--lg btn--line" href="${no ? `#/notice/${no}` : '#/'}">목록</a>
+          <button class="btn btn--lg btn--primary" type="submit">저장</button>
+        </div>
+      </form>`;
+
+    view.querySelectorAll('[data-pick]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const native = view.querySelector(`[data-native="${btn.dataset.pick}"]`);
+        native.value = view.querySelector(`[name="${btn.dataset.pick}"]`).value || '';
+        try { native.showPicker(); } catch (err) { native.focus(); native.click(); }
+      });
+    });
+    view.querySelectorAll('[data-native]').forEach((native) => {
+      native.addEventListener('change', () => { view.querySelector(`[name="${native.dataset.native}"]`).value = native.value; });
+    });
+    view.querySelectorAll('.text-input, .text-area').forEach((f) => f.addEventListener('input', () => clearInputError(f)));
+  }
+
+  function saveForm(form) {
+    const data = Object.fromEntries(new FormData(form));
+    const title = (data.title || '').trim();
+    const body = (data.body || '').trim();
+    let invalid = null;
+    if (!body) { setInputError(form.body, '내용을 입력해 주세요.'); invalid = form.body; }
+    if (!title) { setInputError(form.title, '제목을 입력해 주세요.'); invalid = form.title; }
+    if (invalid) { invalid.focus(); return; }
+
+    const values = {
+      title, body, pinned: !!data.pinned, popup: !!data.popup,
+      popupFrom: data.popupFrom || '', popupTo: data.popupTo || ''
+    };
+    const no = Number(form.dataset.no);
+    if (no) {
+      Object.assign(notices.find((x) => x.no === no), values);
+      showToast('success', '공지사항 수정이 완료되었습니다.');
+      location.hash = `#/notice/${no}`;
+    } else {
+      const next = Math.max(0, ...notices.map((x) => x.no)) + 1;
+      notices.push({ no: next, date: today(), views: 0, ...values });
+      state.page = 1;
+      showToast('success', '공지사항 등록이 완료되었습니다.');
+      location.hash = '#/';
+    }
+  }
+
+  /* ---------------- 삭제 확인 (Prada.confirm) ---------------- */
+  async function confirmDelete(nos) {
+    if (!(await Prada.confirm({ title: '선택하신 공지를 삭제하시겠습니까?', message: '삭제 후 복구는 불가능합니다.' }))) return;
+    notices = notices.filter((n) => !nos.includes(n.no));
+    nos.forEach((no) => state.selected.delete(no));
+    showToast('success', '공지사항 삭제가 완료되었습니다.');
+    if (location.hash.startsWith('#/notice/')) location.hash = '#/'; else renderList();
+  }
+
+  /* ---------------- 첫 진입 팝업 ---------------- */
+  const popupModal = document.getElementById('popupModal');
+  const NEVER_KEY = 'prada.notice.popupNever';
+  const SEEN_KEY = 'prada.notice.popupSeen';
+  const store = (s, k, v) => { try { v === undefined ? null : s.setItem(k, v); return s.getItem(k); } catch (e) { return null; } };
+  let popupNotice = null;
+  function maybeShowPopup() {
+    popupNotice = notices.find((n) => n.popup);
+    if (!popupNotice) return;
+    const never = (store(localStorage, NEVER_KEY) || '').split(',');
+    if (never.includes(String(popupNotice.no)) || store(sessionStorage, SEEN_KEY) === String(popupNotice.no)) return;
+    document.getElementById('popupTitle').textContent = popupNotice.pinned ? `[필독] ${popupNotice.title}` : popupNotice.title;
+    document.getElementById('popupMeta').textContent = `${popupNotice.date} · 관리자 · 조회 ${popupNotice.views}`;
+    document.getElementById('popupBody').textContent = popupNotice.body;
+    popupModal.hidden = false;
+    popupModal.querySelector('.dialog').focus();
+  }
+  function closePopup(never) {
+    popupModal.hidden = true;
+    if (!popupNotice) return;
+    store(sessionStorage, SEEN_KEY, String(popupNotice.no));
+    if (never) {
+      const list = (store(localStorage, NEVER_KEY) || '').split(',').filter(Boolean);
+      store(localStorage, NEVER_KEY, [...new Set([...list, String(popupNotice.no)])].join(','));
+    }
+  }
+  document.getElementById('popupClose').addEventListener('click', () => closePopup(false));
+  document.getElementById('popupNever').addEventListener('click', () => closePopup(true));
+  popupModal.querySelector('[data-close-popup]').addEventListener('click', () => closePopup(false));
+
+  /* ---------------- Esc (드롭다운·확인 모달·셸 메뉴는 prada.js가 처리) ---------------- */
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !popupModal.hidden) closePopup(false); });
+
+  /* ---------------- 라우팅 ---------------- */
+  function route() {
+    const h = location.hash || '#/';
+    let m;
+    if ((m = h.match(/^#\/notice\/(\d+)$/))) renderDetail(Number(m[1]));
+    else if (h === '#/write') renderForm(null);
+    else if ((m = h.match(/^#\/edit\/(\d+)$/))) renderForm(Number(m[1]));
+    else renderList();
+    view.classList.remove('is-entering');
+    void view.offsetWidth;            // 화면 전환마다 페이드 다시 재생
+    view.classList.add('is-entering');
+    window.scrollTo(0, 0);
+    syncScrollBtn();
+  }
+  window.addEventListener('hashchange', route);
+  route();
+})();
+</script>
+</body>
+</html>

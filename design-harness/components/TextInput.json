@@ -1,0 +1,41 @@
+{
+  "name": "TextInput",
+  "figmaKey": null,
+  "codePath": "prada.css .text-input · prada.js setInputError/clearInputError",
+  "intent": "한 줄 값을 입력받는다.",
+  "variants": {
+    "state": [
+      "default",
+      "hovered",
+      "focused",
+      "typing",
+      "completed",
+      "error",
+      "disabled"
+    ],
+    "slot": [
+      "none",
+      "right-icon(달력·지우기)",
+      "unit(%)"
+    ]
+  },
+  "tokens": {
+    "default": "components.text-input"
+  },
+  "use": [
+    "높이 40, 패딩 0/16(CSS 15), Label 1. 라벨은 위에 6 간격(Box).",
+    "hover·focus·입력 중 테두리 Border/Brand, 오류 Border/Error + 아래 4px 빨간 문구(Caption 1).",
+    "오류는 다시 입력하면 바로 지운다.",
+    "숫자만 받는 칸은 숫자 외 입력과 자릿수 초과를 막는다(inputmode numeric).",
+    "날짜 칸은 오른쪽 달력 아이콘 20 + 네이티브 날짜 선택."
+  ],
+  "avoid": [
+    "둥글게 하지 않는다(로그인 입력만 radius 4).",
+    "오류를 토스트만으로 알리지 않는다 — 칸 아래 문구가 먼저.",
+    "Disabled 칸에 hover·focus 반응을 주지 않는다."
+  ],
+  "a11y": [
+    "label 또는 aria-label 필수.",
+    "오류 문구는 aria-describedby로 연결, aria-invalid=true."
+  ]
+}

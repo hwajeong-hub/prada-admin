@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRADA 서비스관리</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="prada.css?v=20261030s">
+<style>
+/* =========================================================
+   4. 화면 — 서비스관리 [마스터] (목록 템플릿·기간 선택·컴포넌트는 prada.css)
+   ========================================================= */
+.svc-metric { margin-bottom: 16px; }                    /* 현황 ↔ 검색 40 */
+@media (min-width: 768px) { .svc-metric .metric__item:first-child { flex: 1.41 1 0; } }   /* 시안: 조회 기간 335 : 나머지 238 비율 그대로 (좁아지면 함께 줄어든다) */
+/* 기간 줄: [시작일] ~ [종료일] 8 [서비스 Dropdown 123] (빠른 기간 버튼 없음) */
+.svc-toolbar { justify-content: flex-start; gap: 8px; }
+.svc-toolbar .select { width: 123px; }
+/* 표: 7칸 균등 (서비스명 · 아이디 · 비밀번호 · 발주일수 · 연장일수 · 환불일수 · 일수합계) */
+.svc-table { table-layout: fixed; }
+
+@media (max-width: 767px) {
+  .svc-metric { margin-bottom: 0; }
+  .svc-metric .metric__item:first-child { width: 100%; }   /* 조회 기간 한 줄 → 2칸씩 */
+  .svc-toolbar { flex-wrap: wrap; }
+  .svc-toolbar .select { width: 100%; }
+  .svc-table { width: 700px; }                /* 모바일 시안: 칸 100 */
+}
+</style>
+</head>
+<body data-prada-page="service.html">
+
+<div class="app-body">
+  <main class="main">
+    <div class="page-header">
+      <h1 class="heading-1-semibold">서비스관리</h1>
+      <p class="page-header__desc label-1-regular">관리 중인 서비스의 발주 통계를 확인할 수 있습니다.</p>
+    </div>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+
+<script src="prada.js?v=20261030s"></script>
+<script>
+(() => {
+  const { syncScrollBtn, mountSelect, searchBarHTML, syncSearchClear, listNavHTML, esc } = Prada;   // prada.js
+  const { ymd } = Prada.period;
+
+  /* ---------------- 데이터 (시안용 예시): 서비스 × 계정 × 일자별 정산 ---------------- */
+  const seeded = (seed) => { let s = seed % 2147483647; if (s <= 0) s += 2147483646; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+  const TODAY = (() => { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })();
+  const SERVICES = ['마운틴', '이지', '인덱스', '더블', '오스틴'];
+  const IDS = ['asdf', 'prada', 'hermes', 'adflex', 'pullim', 'prime1234', 'lifetone12', 'our1', 'a123456', 'green45'];
+  const accounts = IDS.flatMap((id, i) => [SERVICES[i % SERVICES.length], SERVICES[(i + 2) % SERVICES.length]].map((service) => ({ service, id, pw: '123456' })));
+  const logs = [];
+  (() => {
+    const r = seeded(41);
+    for (let d = 0; d < 160; d++) {
+      const date = ymd(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - d));
+      for (let k = 0, n = 2 + Math.floor(r() * 6); k < n; k++) {
+        const a = accounts[Math.floor(r() * accounts.length)];
+        const x = r();
+        logs.push({ date, service: a.service, id: a.id, type: x < 0.55 ? 'new' : x < 0.8 ? 'extend' : 'refund', days: [10, 20, 30][Math.floor(r() * 3)] });
+      }
+    }
+  })();
+
+  /* ---------------- 상태 ---------------- */
+  const state = {
+    from: ymd(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1)), to: ymd(TODAY), quick: null,   // 기본 = 이번 달
+    service: 'all', page: 1, pageSize: 50, field: 'all', query: ''
+  };
+  const view = document.getElementById('view');
+  const d = (n) => `${n.toLocaleString()}일`;
+
+  // 서비스 × 계정 한 줄: 발주·연장·환불 일수, 일수합계 = 발주 + 연장 − 환불 (조회 기간 안)
+  function rows() {
+    const q = state.query.trim().toLowerCase();
+    const inRange = logs.filter((l) => l.date >= state.from && l.date <= state.to);
+    return accounts
+      .filter((a) => (state.service === 'all' || a.service === state.service) &&
+        (!q || ((state.field === 'all' || state.field === 'id') && a.id.toLowerCase().includes(q)) || ((state.field === 'all' || state.field === 'service') && a.service.includes(q))))
+      .map((a) => {
+        const mine = inRange.filter((l) => l.service === a.service && l.id === a.id);
+        const sum = (t) => mine.filter((l) => l.type === t).reduce((s, l) => s + l.days, 0);
+        const [n, e, r] = [sum('new'), sum('extend'), sum('refund')];
+        return { ...a, n, e, r, total: n + e - r };
+      });
+  }
+
+  function metricHTML(list) {
+    const [n, e, r] = ['n', 'e', 'r'].map((k) => list.reduce((a, x) => a + x[k], 0));
+    const item = (v, l) => `
+      <div class="metric__item">
+        <strong class="metric__value title-semibold">${v}</strong>
+        <span class="metric__label body-3-regular">${l}</span>
+      </div>`;
+    return `
+      <section class="metric svc-metric" aria-labelledby="metricTitle">
+        <h2 class="metric__title heading-2-semibold" id="metricTitle">검색 결과</h2>
+        <div class="metric__items">
+          ${item(`${state.from} ~ ${state.to}`, '조회 기간')}<span class="metric__divider"></span>
+          ${item(state.service === 'all' ? '전체' : esc(state.service), '서비스명')}<span class="metric__divider"></span>
+          ${item(n.toLocaleString(), '발주 일수')}<span class="metric__divider"></span>
+          ${item(e.toLocaleString(), '연장 일수')}<span class="metric__divider"></span>
+          ${item(r.toLocaleString(), '환불 일수')}<span class="metric__divider"></span>
+          ${item((n + e - r).toLocaleString(), '일수 합계')}
+        </div>
+      </section>`;
+  }
+
+  function renderList() {
+    const list = rows();
+    const totalPages = Math.max(1, Math.ceil(list.length / state.pageSize));
+    state.page = Math.min(state.page, totalPages);
+    const pageRows = list.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
+
+    view.innerHTML = `
+      ${metricHTML(list)}
+      ${searchBarHTML(state.query)}
+      <div class="list-block">
+        <div class="toolbar toolbar--period svc-toolbar">
+          ${Prada.period.html(state, [])}
+          <div class="select" data-select="service"></div>
+        </div>
+        <div class="table-scroll">
+          <table class="table svc-table">
+            <thead><tr><th>서비스명</th><th>아이디</th><th>비밀번호</th><th>발주일수</th><th>연장일수</th><th>환불일수</th><th>일수합계</th></tr></thead>
+            <tbody>
+              ${pageRows.length ? pageRows.map((x) => `
+                <tr><td>${esc(x.service)}</td><td>${esc(x.id)}</td><td>${esc(x.pw)}</td><td>${d(x.n)}</td><td>${d(x.e)}</td><td>${d(x.r)}</td><td>${d(x.total)}</td></tr>`).join('')
+                : '<tr><td class="table__empty" colspan="7">검색 결과가 없습니다.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ${listNavHTML(state.page, totalPages)}`;
+
+    mountSelect(view.querySelector('[data-select="field"]'),
+      [{ value: 'all', label: '전체' }, { value: 'id', label: '아이디' }, { value: 'service', label: '서비스명' }],
+      state.field, (v) => { state.field = v; });
+    mountSelect(view.querySelector('[data-select="service"]'),
+      [{ value: 'all', label: '전체' }, ...SERVICES.map((s) => ({ value: s, label: s }))],
+      state.service, (v) => { state.service = v; state.page = 1; renderList(); }, { label: '서비스' });
+    mountSelect(view.querySelector('[data-select="size"]'),
+      [10, 30, 50].map((n) => ({ value: String(n), label: `${n}개씩 보기` })),
+      String(state.pageSize), (v) => { state.pageSize = Number(v); state.page = 1; renderList(); });
+    syncScrollBtn();
+  }
+
+  /* ---------------- 기간 (prada.js Prada.period, 빠른 버튼 없음) ---------------- */
+  Prada.period.bind(view, () => state, [], (from, to) => {
+    Object.assign(state, { from, to, page: 1 });
+    renderList();
+  });
+
+  view.addEventListener('click', (e) => {
+    if (e.target.closest('#searchClear')) {
+      view.querySelector('#searchInput').value = '';
+      if (state.query) { state.query = ''; state.page = 1; renderList(); } else syncSearchClear();
+      view.querySelector('#searchInput').focus();
+      return;
+    }
+    const pageBtn = e.target.closest('.pagination [data-page]');
+    if (pageBtn && !pageBtn.disabled) { state.page = Number(pageBtn.dataset.page); renderList(); }
+  });
+  view.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (e.target.id === 'searchForm') {
+      state.query = view.querySelector('#searchInput').value; state.page = 1; renderList();
+    } else if (e.target.id === 'gotoForm') {
+      const total = Math.max(1, Math.ceil(rows().length / state.pageSize));
+      const p = parseInt(view.querySelector('#gotoInput').value, 10);
+      state.page = Number.isFinite(p) ? Math.min(Math.max(p, 1), total) : state.page;
+      renderList();
+    }
+  });
+
+  renderList();
+  view.classList.add('is-entering');   // 화면 진입 페이드
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRADA 정산관리</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="prada.css?v=20261030s">
+<style>
+/* =========================================================
+   4. 화면 — 캠페인 › 정산관리 (목록 템플릿·기간 선택·칩·로딩은 prada.css)
+   ========================================================= */
+/* 위: 매체 칩(위아래 6) 6 기간 줄 → 표 24 */
+.cs-top { display: flex; flex-direction: column; gap: 6px; }
+.cs-toolbar { gap: 8px; }
+.cs-toolbar .period { gap: 6px; }
+.cs-toolbar .period__quick { display: flex; }
+.cs-toolbar__right { display: flex; gap: 8px; }
+/* 표: 일자 230 · 구분 80 · 나머지 230 */
+.cs-table { table-layout: fixed; }
+.cs-table .col-type { width: 80px; }
+
+/* 단가설정 (Modal / Dialog 630) */
+/* 화면보다 길면 대화상자 대신 바깥(딤)이 스크롤 */
+#rateModal { align-items: flex-start; overflow-y: auto; }
+.dialog--rate { width: 630px; max-height: none; flex: none; margin: auto 0; }
+.rate__table-scroll { overflow-x: auto; }
+.rate { display: flex; flex-direction: column; gap: 20px; }
+.rate__info { display: flex; flex-direction: column; gap: 2px; color: var(--text-tertiary); font: 500 13px/19.5px var(--font-family); letter-spacing: var(--letter-spacing); }   /* Body3/Medium 13 · 150% */
+.rate__info li { display: flex; gap: 4px; }
+.rate__info li::before { content: "·"; flex: none; width: 4px; }
+.rate__form { display: flex; flex-direction: column; gap: 16px; padding: 16px; border: 1px solid var(--border-tertiary); border-radius: var(--radius-m); }   /* 시안: 테두리 안쪽 16 (내용 556) */
+.rate__rows { display: flex; flex-direction: column; gap: 10px; }
+.rate__row { display: flex; align-items: flex-start; gap: 8px; }
+.rate__row > .field { flex: 1; min-width: 0; }
+.rate__row .select { width: 100%; }
+.rate__row .input-icon { flex: none; width: 100%; }
+.rate__tilde { flex: none; line-height: 40px; margin-top: 26px; color: var(--text-tertiary); }
+.rate__row--range .btn { flex: none; width: 77px; padding: 0; margin-top: 26px; }   /* 시안: 버튼 77 */
+.rate__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.rate__title { margin-bottom: 10px; color: var(--text-primary); font: 500 14px/21px var(--font-family); letter-spacing: var(--letter-spacing); }   /* Body2/Medium 14 · 150% */
+/* 전체 단가 표 (Style=Plain): 머리 BG/Table-Header 34 · Text/Primary, 행 40 아래 선만 */
+.rate-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.rate-table th, .rate-table td { padding: 0 12px; text-align: center; font: 400 12px/18px var(--font-family); letter-spacing: var(--letter-spacing); white-space: nowrap; }
+.rate-table th { height: 34px; background: var(--bg-table-header); border-bottom: 1px solid var(--border-secondary); color: var(--text-primary); }
+.rate-table td { height: 40px; border-bottom: 1px solid var(--border-tertiary); color: var(--text-primary); }
+.rate-table td.is-sub { color: var(--text-tertiary); }
+.rate-table__empty { color: var(--text-subtle) !important; }
+
+@media (max-width: 767px) {
+  .cs-toolbar { flex-wrap: wrap; }
+  .cs-toolbar .period { display: contents; }
+  .cs-toolbar .period__range { width: 100%; }
+  .cs-toolbar__right .btn { padding: 0 11px; }
+  .cs-table { width: 780px; }                 /* 모바일 시안: 구분 80 · 나머지 100 */
+  .dialog.dialog--rate { width: 340px; }
+  /* 모바일 시안: 매체·카테고리·적용 시작일 세로로 / 구간 [이상] ~ [상한] 한 줄 + 아래 [구간삭제][구간추가] / 단가·NET 나란히 */
+  .rate__rows { gap: 24px; }                                        /* 모바일 시안: 묶음 사이 24, 묶음 안 8 */
+  .rate__row--top { flex-direction: column; align-items: stretch; gap: 8px; }
+  .rate__actions .btn { flex: 1; }                                     /* [추가하기] 꽉 찬 폭 */
+  .rate__row--range { flex-wrap: wrap; }
+  .rate__row--range > .field { flex: 1 1 calc(50% - 12px); }        /* [이상] ~ [상한]이 한 줄을 채우고 */
+  .rate__row--range .btn { flex: 1 1 calc(50% - 4px); width: auto; margin-top: 0; }   /* 버튼 둘은 다음 줄 반씩 */
+  .rate-table { width: 590px; }
+}
+</style>
+</head>
+<body data-prada-page="campaign-settle.html">
+
+<div class="app-body">
+  <main class="main">
+    <div class="page-header">
+      <h1 class="heading-1-semibold">정산관리</h1>
+      <p class="page-header__desc label-1-regular">매체별 일자 정산(단가·VAT 포함)을 확인할 수 있습니다.</p>
+    </div>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+
+<!-- 단가설정 (Modal / Dialog 630) -->
+<div class="modal" id="rateModal" hidden>
+  <div class="dialog dialog--rate" role="dialog" aria-modal="true" aria-labelledby="rateTitle" tabindex="-1">
+    <h2 class="dialog__header body-1-semibold" id="rateTitle">단가설정</h2>
+    <div class="rate">
+      <ul class="rate__info">
+        <li>이 사이트 전용 단가로, 저장하면 키워드퀴즈 정산에는 사이트별 단가의 평균이 반영됩니다.</li>
+        <li>이 사이트 단가가 없으면 기본(키워드퀴즈)단가가 적용됩니다.</li>
+      </ul>
+      <form class="rate__form" id="rateForm" novalidate>
+        <div class="rate__rows" id="rateRows"></div>
+        <div class="rate__actions">
+          <button class="btn btn--lg btn--primary" type="submit">추가하기</button>
+        </div>
+      </form>
+      <div>
+        <h3 class="rate__title">전체 단가</h3>
+        <div class="rate__table-scroll"><table class="rate-table">
+          <colgroup><col style="width:80px"><col style="width:80px"><col style="width:120px"><col style="width:120px"><col style="width:60px"><col style="width:130px"></colgroup>
+          <thead><tr><th>구분</th><th>매체</th><th>카테고리</th><th>적용 시작일</th><th>구간</th><th>단가</th></tr></thead>
+          <tbody id="rateTable"></tbody>
+        </table></div>
+      </div>
+    </div>
+    <div class="cta"><button class="btn btn--md btn--line" type="button" data-rate-close>닫기</button></div>
+    <button class="dialog__close" type="button" aria-label="닫기" data-rate-close><svg width="20" height="20"><use href="#i-close"/></svg></button>
+  </div>
+</div>
+
+<script src="prada.js?v=20261030s"></script>
+<script src="campaign-data.js?v=20261030s"></script>
+<script>
+(() => {
+  const { esc, icon, showToast, setInputError, clearInputError, syncScrollBtn, mountSelect, listNavHTML } = Prada;
+  const { MEDIA, CATEGORIES, seeded, ymd, addDays, today } = CampaignData;   // campaign-data.js
+
+  /* ---------------- 데이터: 매체 × 일자 정산 (시안용 예시) ---------------- */
+  const DAYS = 180;
+  const rows = {};   // rows[매체] = [{ date, type, target, used, unit }]
+  MEDIA.forEach((m, mi) => {
+    rows[m] = Array.from({ length: DAYS }, (_, d) => {
+      const r = seeded(500 + mi * 997 + d);
+      const target = Math.round((1700 + r() * 400) / 10) * 10;
+      return { date: ymd(addDays(today, -d)), type: '쇼핑', target, used: Math.round(target * (0.7 + r() * 0.29)), unit: 16.5 + Math.round(r() * 120) / 100 };
+    });
+  });
+  const won = (n) => `₩ ${n.toLocaleString()}`;
+  function dayRows(media, from, to) {
+    const list = media === 'all' ? MEDIA : [media];
+    return Array.from({ length: DAYS }, (_, d) => rows[MEDIA[0]][d].date).filter((date) => date >= from && date <= to).map((date) => {
+      const ds = list.map((m) => rows[m].find((x) => x.date === date));
+      const target = ds.reduce((a, x) => a + x.target, 0);
+      const used = ds.reduce((a, x) => a + x.used, 0);
+      const amount = Math.round(ds.reduce((a, x) => a + x.used * x.unit, 0));        // 매체단가 = 소진유입수 × 유입당원가
+      const vat = Math.round(amount * 0.1);
+      return { date, type: '쇼핑', target, used, unit: used ? Math.round((amount / used) * 100) / 100 : 0, amount, vat, total: amount + vat };
+    });
+  }
+
+  /* ---------------- 상태 ---------------- */
+  // 빠른 기간: [오늘][이번 달], 기본 = 이번 달
+  const QUICK = [Prada.period.days()[0], { ...Prada.period.months(1)[0], label: '이번 달' }];
+  const state = { media: 'all', from: ymd(QUICK[1].range[0]), to: ymd(QUICK[1].range[1]), quick: QUICK[1].key, page: 1, pageSize: 50, loading: false };
+  const view = document.getElementById('view');
+
+  function renderList() {
+    const list = dayRows(state.media, state.from, state.to);
+    const totalPages = Math.max(1, Math.ceil(list.length / state.pageSize));
+    state.page = Math.min(state.page, totalPages);
+    const pageRows = list.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
+    view.innerHTML = `
+      <div class="cs-top">
+        <div class="chips" role="radiogroup" aria-label="매체">
+          ${['all', ...MEDIA].map((m) => `<button class="chip" type="button" role="radio" aria-checked="${state.media === m}" data-media="${esc(m)}">${m === 'all' ? '전체' : esc(m)}</button>`).join('')}
+        </div>
+        <div class="toolbar toolbar--period cs-toolbar">
+          ${Prada.period.html(state, QUICK)}
+          <div class="cs-toolbar__right">
+            <button class="btn btn--lg btn--line" type="button" data-act="rate">단가설정</button>
+            <button class="btn btn--lg btn--line" type="button" data-act="download">${icon('i-download', 16)}정산 다운로드</button>
+          </div>
+        </div>
+      </div>
+      <div class="table-scroll loading-host">
+        <table class="table cs-table">
+          <thead><tr><th>일자</th><th class="col-type">구분</th><th>목표유입수</th><th>소진유입수</th><th>유입당원가</th><th>매체단가</th><th>VAT(10%)</th><th>총정산금액</th></tr></thead>
+          <tbody>
+            ${pageRows.length ? pageRows.map((r) => `
+              <tr><td>${r.date}</td><td>${r.type}</td><td>${r.target.toLocaleString()}</td><td>${r.used.toLocaleString()}</td>
+                <td>${won(r.unit)}</td><td>${won(r.amount)}</td><td>${won(r.vat)}</td><td>${won(r.total)}</td></tr>`).join('')
+              : '<tr><td class="table__empty" colspan="8">조회된 정산 데이터가 없습니다.</td></tr>'}
+          </tbody>
+        </table>
+        ${state.loading ? `<div class="loading-overlay" role="status">
+          <svg class="loading-overlay__spinner" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="none" stroke="var(--border-tertiary)" stroke-width="6"/><path d="M24 0a24 24 0 0 1 24 24h-6A18 18 0 0 0 24 6Z" fill="var(--icon-brand)"/></svg>
+          <span class="loading-overlay__text">정산 데이터를 불러오는 중...</span>
+        </div>` : ''}
+      </div>
+      ${listNavHTML(state.page, totalPages)}`;
+    mountSelect(view.querySelector('[data-select="size"]'),
+      [10, 30, 50].map((n) => ({ value: String(n), label: `${n}개씩 보기` })),
+      String(state.pageSize), (v) => { state.pageSize = Number(v); state.page = 1; renderList(); });
+    syncScrollBtn();
+  }
+
+  // 매체·기간이 바뀌면 "불러오는 중" 뒤에 표를 다시 그린다 (시안 로딩 화면)
+  let loadTimer;
+  function reload(focusSel) {
+    state.page = 1; state.loading = true;
+    renderList();
+    if (focusSel) view.querySelector(focusSel)?.focus({ preventScroll: true });
+    clearTimeout(loadTimer);
+    loadTimer = setTimeout(() => { state.loading = false; renderList(); if (focusSel) view.querySelector(focusSel)?.focus({ preventScroll: true }); }, 600);
+  }
+
+  Prada.period.bind(view, () => state, QUICK, (from, to, quick) => {
+    Object.assign(state, { from, to, quick });
+    reload(quick ? `[data-quick="${quick}"]` : null);
+  });
+  view.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-media]');
+    if (chip) { if (chip.dataset.media !== state.media) { state.media = chip.dataset.media; reload(`[data-media="${CSS.escape(state.media)}"]`); } return; }
+    const pageBtn = e.target.closest('.pagination [data-page]');
+    if (pageBtn && !pageBtn.disabled) { state.page = Number(pageBtn.dataset.page); renderList(); return; }
+    if (e.target.closest('[data-act="rate"]')) openRate();
+    if (e.target.closest('[data-act="download"]')) download();
+  });
+  view.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (e.target.id === 'gotoForm') {
+      const total = Math.max(1, Math.ceil(dayRows(state.media, state.from, state.to).length / state.pageSize));
+      const p = parseInt(view.querySelector('#gotoInput').value, 10);
+      state.page = Number.isFinite(p) ? Math.min(Math.max(p, 1), total) : state.page;
+      renderList();
+    }
+  });
+
+  /* ---------------- 정산 다운로드 (CSV) ---------------- */
+  function download() {
+    const list = dayRows(state.media, state.from, state.to);
+    if (!list.length) { showToast('error', '다운로드할 정산 데이터가 없습니다.'); return; }
+    const head = ['일자', '구분', '목표유입수', '소진유입수', '유입당원가', '매체단가', 'VAT(10%)', '총정산금액'];
+    const cell = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = '﻿' + [head, ...list.map((r) => [r.date, r.type, r.target, r.used, r.unit, r.amount, r.vat, r.total])].map((r) => r.map(cell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const name = state.media === 'all' ? '전체' : state.media;
+    const a = Object.assign(document.createElement('a'), { href: url, download: `정산관리_${name}_${state.from.replace(/-/g, '')}-${state.to.replace(/-/g, '')}.csv` });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  /* ---------------- 단가설정 (Modal / Dialog 630) ---------------- */
+  const rateModal = document.getElementById('rateModal');
+  const rateForm = document.getElementById('rateForm');
+  const rateRowsEl = document.getElementById('rateRows');
+  // 기본 단가: 매체마다 카테고리별 두 시점
+  const rates = [];
+  MEDIA.forEach((m, mi) => CATEGORIES.slice().sort((a, b) => (a === '저장' ? -1 : b === '저장' ? 1 : a === '쇼핑' ? -1 : 1)).forEach((c, ci) => {
+    [['2026-01-01', 0], ['2026-07-06', 1]].forEach(([d, k]) => rates.push({ kind: '기본', media: m, category: c, start: d, range: '-', price: [27, 16, 18][ci] + k * [6, 4, 5][ci] + (mi % 3) }));
+  }));
+  // 구간(이상~미만)은 NBT 매체에서만 — 구간마다 한 줄, [구간삭제][구간추가]
+  const RANGE_MEDIA = 'NBT';
+  const rate = { media: MEDIA[0], category: '쇼핑', start: '', price: '', net: '', ranges: [{ from: '0', to: '' }] };
+  const hasRange = () => rate.media === RANGE_MEDIA;
+  // 다시 그리기 전에 입력값을 기억해 둔다 (매체를 바꾸거나 구간을 늘리고 줄여도 값 유지)
+  function readRateForm() {
+    const v = (id) => (document.getElementById(id) ? document.getElementById(id).value : '');
+    rate.start = v('rateStart'); rate.price = v('ratePrice'); rate.net = v('rateNet');
+    rateRowsEl.querySelectorAll('[data-range]').forEach((row) => {
+      const i = Number(row.dataset.range);
+      rate.ranges[i] = { from: row.querySelector('[name="from"]').value, to: row.querySelector('[name="to"]').value };
+    });
+  }
+
+  // 적용 시작일은 시안대로 "YYYY. MM. DD"로 보이고, 저장할 때는 YYYY-MM-DD
+  const dotDate = (v) => v.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$1. $2. $3');
+  const dashDate = (v) => v.trim().replace(/^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?$/, (m, y, mo, d) => `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`);
+  const fieldBox = (label, control, cls = '') => `<div class="field ${cls}"><span class="field__label label-1-regular">${label}</span>${control}</div>`;
+  function renderRateForm() {
+    rateRowsEl.innerHTML = `
+      <div class="rate__row rate__row--top">
+        ${fieldBox('매체', '<div class="select" data-rate-select="media"></div>')}
+        ${fieldBox('카테고리', '<div class="select" data-rate-select="category"></div>')}
+        ${fieldBox('적용 시작일', `<span class="input-icon">
+          <input class="text-input label-1-regular" id="rateStart" name="start" value="${esc(rate.start || dotDate(ymd(today)))}" placeholder="연도. 월. 일" aria-label="적용 시작일" inputmode="numeric" maxlength="10">
+          <button class="input-icon__btn" type="button" data-rate-pick aria-label="적용 시작일 달력 열기">${icon('i-calendar')}</button>
+          <input class="input-icon__native" type="date" tabindex="-1" aria-hidden="true" data-rate-native>
+        </span>`)}
+      </div>
+      ${hasRange() ? rate.ranges.map((r, i) => `
+      <div class="rate__row rate__row--range" data-range="${i}">
+        ${fieldBox(i === 0 ? '구간(이상~미만)' : '&nbsp;', `<input class="text-input label-1-regular" id="rateFrom${i}" name="from" value="${esc(r.from)}" placeholder="0" inputmode="numeric" aria-label="구간 ${i + 1} 이상">`)}
+        <span class="rate__tilde label-1-regular">~</span>
+        <div class="field"><span class="field__label label-1-regular" aria-hidden="true">&nbsp;</span><input class="text-input label-1-regular" id="rateTo${i}" name="to" value="${esc(r.to)}" placeholder="상한 금액" inputmode="numeric" aria-label="구간 ${i + 1} 미만(상한 금액)"></div>
+        <button class="btn btn--lg btn--line" type="button" data-range-remove="${i}" ${rate.ranges.length === 1 ? 'disabled' : ''}>구간삭제</button>
+        <button class="btn btn--lg btn--secondary" type="button" data-range-add="${i}">구간추가</button>
+      </div>`).join('') : ''}
+      <div class="rate__row">
+        ${fieldBox('단가(원)', `<input class="text-input label-1-regular" id="ratePrice" name="price" value="${esc(rate.price)}" placeholder="0" inputmode="numeric" aria-label="단가(원)">`)}
+        ${fieldBox('NET(원)', `<input class="text-input label-1-regular" id="rateNet" name="net" value="${esc(rate.net)}" placeholder="미입력 시 단가" inputmode="numeric" aria-label="NET(원)">`)}
+      </div>`;
+    mountSelect(rateRowsEl.querySelector('[data-rate-select="media"]'), MEDIA.map((m) => ({ value: m, label: m })), rate.media,
+      (v) => { readRateForm(); rate.media = v; renderRateForm(); renderRateTable(); rateRowsEl.querySelector('[data-rate-select="media"] .select__field').focus(); }, { chevron: true, label: '매체' });
+    mountSelect(rateRowsEl.querySelector('[data-rate-select="category"]'), CATEGORIES.map((c) => ({ value: c, label: c })), rate.category,
+      (v) => { rate.category = v; }, { chevron: true, label: '카테고리' });
+  }
+  function renderRateTable() {
+    const list = rates.filter((r) => r.media === rate.media);
+    document.getElementById('rateTable').innerHTML = list.length ? list.map((r) => `
+      <tr><td>${r.kind}</td><td>${esc(r.media)}</td><td>${r.category}</td><td class="is-sub">${r.start}</td><td>${r.range}</td><td class="is-sub">${won(r.price)}</td></tr>`).join('')
+      : '<tr><td class="rate-table__empty" colspan="6">등록된 단가가 없습니다.</td></tr>';
+  }
+  function resetRate() { Object.assign(rate, { start: '', price: '', net: '', ranges: [{ from: '0', to: '' }] }); }
+  function openRate() {
+    resetRate();
+    renderRateForm();
+    renderRateTable();
+    rateModal.hidden = false;
+    rateModal.scrollTop = 0;
+    rateModal.querySelector('.dialog').focus({ preventScroll: true });
+  }
+  function closeRate() { rateModal.hidden = true; }
+  rateModal.addEventListener('click', (e) => {
+    if (e.target === rateModal || e.target.closest('[data-rate-close]')) { closeRate(); return; }
+    const add = e.target.closest('[data-range-add]');
+    if (add) {
+      readRateForm();
+      const i = Number(add.dataset.rangeAdd);
+      rate.ranges.splice(i + 1, 0, { from: rate.ranges[i].to || '', to: '' });   // 다음 구간은 앞 구간의 상한에서 시작
+      renderRateForm();
+      document.getElementById(`rateTo${i + 1}`).focus();
+      return;
+    }
+    const rm = e.target.closest('[data-range-remove]');
+    if (rm && !rm.disabled) {
+      readRateForm();
+      const i = Number(rm.dataset.rangeRemove);
+      rate.ranges.splice(i, 1);
+      renderRateForm();
+      document.getElementById(`rateFrom${Math.max(0, i - 1)}`).focus();
+      return;
+    }
+    if (e.target.closest('[data-rate-pick]')) {
+      const native = rateModal.querySelector('[data-rate-native]');
+      native.value = dashDate(document.getElementById('rateStart').value);
+      try { native.showPicker(); } catch (err) { native.focus(); native.click(); }
+    }
+  });
+  rateModal.addEventListener('change', (e) => {
+    if (e.target.matches('[data-rate-native]') && e.target.value) { document.getElementById('rateStart').value = dotDate(e.target.value); clearInputError(document.getElementById('rateStart')); }
+  });
+  rateModal.addEventListener('input', (e) => { if (e.target.matches('.text-input')) clearInputError(e.target); });
+  rateForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const $ = (id) => document.getElementById(id);
+    rateForm.querySelectorAll('[aria-invalid="true"]').forEach(clearInputError);
+    const errors = [];
+    const need = (el, msg, ok) => { if (!ok) { setInputError(el, msg); errors.push(el); } };
+    const isNum = (v) => /^\d+$/.test(v);
+    const start = dashDate($('rateStart').value);
+    need($('rateStart'), '날짜 형식을 확인해주세요.', /^\d{4}-\d{2}-\d{2}$/.test(start) && ymd(new Date(`${start}T00:00:00`)) === start);
+    readRateForm();
+    if (hasRange()) {
+      rate.ranges.forEach((r, i) => {
+        need($(`rateFrom${i}`), '숫자를 입력해주세요.', isNum(r.from.trim()));
+        need($(`rateTo${i}`), '이상보다 큰 상한 금액을 입력해주세요.', isNum(r.to.trim()) && Number(r.to) > Number(r.from));
+      });
+    }
+    need($('ratePrice'), '단가를 입력해주세요.', isNum($('ratePrice').value.trim()) && Number($('ratePrice').value) > 0);
+    if ($('rateNet').value.trim()) need($('rateNet'), '숫자를 입력해주세요.', isNum($('rateNet').value.trim()));
+    if (errors.length) { errors[0].focus(); return; }
+    const price = Number($('ratePrice').value);
+    (hasRange() ? rate.ranges.map((r) => `${r.from}~${r.to}`) : ['-']).reverse().forEach((range) => {
+      rates.unshift({ kind: '사이트', media: rate.media, category: rate.category, start, range, price });
+    });
+    resetRate();
+    renderRateForm();
+    renderRateTable();
+    showToast('success', '단가 설정이 추가되었습니다.');
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeRate(); });
+
+  renderList();
+  view.classList.add('is-entering');   // 화면 진입 페이드
+})();
+</script>
+</body>
+</html>

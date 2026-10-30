@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRADA 자주 묻는 질문</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="prada.css?v=20261030s">
+<style>
+/* =========================================================
+   4. 화면 — 자주 묻는 질문 (Accordion Item)
+   ========================================================= */
+/* 목록 외곽: 위·아래 1px Border/Disabled (Figma outside stroke → 레이아웃을 밀지 않게 box-shadow) */
+.accordion { background: var(--bg-surface); box-shadow: 0 -1px 0 var(--border-disabled), 0 1px 0 var(--border-disabled); }
+.accordion__q {
+  display: flex; align-items: center; width: 100%; min-height: 55px; padding: 17.5px 0;
+  background: var(--bg-surface); text-align: left; color: var(--text-primary);
+}
+.accordion__q { transition: background-color var(--motion-state); }
+.accordion__q:hover { background: var(--bg-table-cell-hover); }
+.accordion__q:focus-visible { outline: 2px solid var(--border-brand); outline-offset: -2px; }
+.accordion__mark { flex: none; width: 80px; text-align: center; }
+.accordion__mark--q { color: #3b82f6; }                 /* Table Text/Badge Blue */
+.accordion__mark--a { color: #2d2d2d; }                 /* Table Text/Badge Black */
+.accordion__text { flex: 1; min-width: 0; padding: 0 14px; }
+.accordion__chevron { display: flex; justify-content: center; flex: none; width: 80px; color: var(--icon-default); }
+/* DS Accordion Item: 접힘 Chevron Down → 펼침 Chevron Up (아이콘을 180° 돌려 같은 모양, 200ms) */
+.accordion__chevron svg { transition: transform var(--motion-state); }
+.accordion__item.is-open .accordion__chevron svg { transform: rotate(180deg); }
+.accordion__item.is-open .accordion__q { box-shadow: inset 0 -1px 0 var(--border-tertiary); }   /* 펼침: 질문 아래 1px */
+/* 부드럽게 펼치기: 높이 0fr ↔ 1fr 200ms ease (드롭다운 hover와 같은 200ms), 접힌 동안은 visibility hidden */
+.accordion__panel {
+  display: grid; grid-template-rows: 0fr; visibility: hidden;
+  transition: grid-template-rows .2s ease, visibility 0s linear .2s;
+}
+.accordion__item.is-open .accordion__panel {
+  grid-template-rows: 1fr; visibility: visible;
+  transition: grid-template-rows .2s ease, visibility 0s linear 0s;
+}
+.accordion__panel > div { min-height: 0; overflow: hidden; }
+.accordion__a { display: flex; padding: 18px 0; background: var(--bg-subtle); }
+@media (prefers-reduced-motion: reduce) {
+  .accordion__panel, .accordion__item.is-open .accordion__panel { transition: none; }
+}
+.accordion__a .accordion__text { color: var(--text-tertiary); white-space: pre-line; }
+
+/* =========================================================
+   5. 모바일 (360 기준)
+   ========================================================= */
+@media (max-width: 767px) {
+  .accordion__q { min-height: 53px; padding: 18px 0; font: 600 12px/16px var(--font-family); letter-spacing: var(--letter-spacing); }
+  .accordion__a { font: 400 12px/16px var(--font-family); letter-spacing: var(--letter-spacing); }
+  .accordion__mark, .accordion__chevron { width: 40px; }
+  .accordion__mark { font: 600 12px/16px var(--font-family); letter-spacing: var(--letter-spacing); }
+}
+</style>
+</head>
+<body data-prada-page="faq.html">
+
+<div class="app-body">
+  <main class="main">
+    <div class="page-header">
+      <h1 class="heading-1-semibold">자주 묻는 질문</h1>
+      <p class="page-header__desc label-1-regular">페이지 이용 시 자주 묻는 질문과 답변을 모았습니다.</p>
+    </div>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+
+<script src="prada.js?v=20261030s"></script>
+<script>
+(() => {
+  /* ---------------- 데이터 (Figma 「3. 자주 묻는 질문」 문구) ---------------- */
+  const FAQ = [
+    ['회원탈퇴를 할 수 있나요?', '가능합니다!\n계정관리 메뉴에서 삭제할 계정을 선택 후, 삭제 처리를 진행해 주시면 됩니다.'],
+    ['회원탈퇴 후 재가입할 수 있나요?', '가능합니다!\n재가입이 필요할 경우 상위 접수처에 계정 생성 요청을 해주시기 바랍니다.'],
+    ['비밀번호를 수정할 수 있나요?', '가능합니다!\n계정관리 메뉴에서 수정할 계정을 선택 후, 수정 버튼을 눌러 원하는 비밀번호로 변경하실 수 있습니다.'],
+    ['개인정보 유출 위험은 없나요?', '개인정보를 별도로 수집하지 않습니다.\n다만, 사용 중인 ID/PW가 다른 플랫폼과 동일하다면 보안 문제가 발생할 수 있으므로, 고유한 ID/PW 사용을 권장드립니다.'],
+    ['N위 이내 키워드란 무엇인가요?', '특정 상품의 순위가 N위 안에 랭크된 키워드를 의미합니다.\n프로그램 또는 리워드 작업 시 유입 경로 확보를 위해 필요합니다.'],
+    ['오류 상태입니다. 어떻게 해야 하나요?', '상품이 품절되었거나 삭제된 경우가 없는지 확인해 주세요.'],
+    ['상품 순위가 순위밖으로 표시됩니다.', '1,000위 이내에 노출되는 키워드로 수정 후 작업을 진행해 주시기 바랍니다.'],
+    ['여러 항목을 다중 선택할 수 없나요?', '다중 선택 기능을 지원합니다.\n첫 행을 체크한 뒤, 마지막 행에서 SHIFT + 체크를 하면 시작~끝 행까지 다중 선택이 가능하며, 이후 수정 또는 삭제할 수 있습니다.'],
+    ['차순정렬 기능이 있나요?', '있습니다.\n각 항목의 우측 정렬 아이콘을 이용해 원하는 기준으로 정렬할 수 있습니다.'],
+    ['필터 정렬 기능이 있나요?', '있습니다.\n필요 항목에 따라 필터 적용이 가능하며, 다중 필터도 지원됩니다.']
+  ];
+  const { esc, icon, syncScrollBtn } = Prada;   // prada.js
+
+  /* ---------------- 아코디언 (Accordion Item) ---------------- */
+  const view = document.getElementById('view');
+  view.innerHTML = `
+    <ul class="accordion">
+      ${FAQ.map(([q, a], i) => `
+        <li class="accordion__item">
+          <button class="accordion__q body-3-semibold" type="button" aria-expanded="false" aria-controls="faq-a-${i}" id="faq-q-${i}">
+            <span class="accordion__mark accordion__mark--q">Q</span>
+            <span class="accordion__text">${esc(q)}</span>
+            <span class="accordion__chevron">${icon('i-chevron-down', 16)}</span>
+          </button>
+          <div class="accordion__panel" id="faq-a-${i}" role="region" aria-labelledby="faq-q-${i}">
+            <div>
+              <div class="accordion__a body-3-regular">
+                <span class="accordion__mark accordion__mark--a body-3-semibold">A</span>
+                <p class="accordion__text">${esc(a)}</p>
+              </div>
+            </div>
+          </div>
+        </li>`).join('')}
+    </ul>`;
+  view.classList.add('is-entering');   // 화면 진입 페이드
+  view.addEventListener('click', (e) => {
+    const q = e.target.closest('.accordion__q');
+    if (!q) return;
+    const open = q.getAttribute('aria-expanded') !== 'true';
+    // 한 번에 하나만 펼친다: 다른 항목을 열면 이전에 펼친 항목은 접힌다.
+    view.querySelectorAll('.accordion__q[aria-expanded="true"]').forEach((other) => {
+      if (other === q) return;
+      other.setAttribute('aria-expanded', 'false');
+      other.closest('.accordion__item').classList.remove('is-open');
+    });
+    q.setAttribute('aria-expanded', String(open));
+    q.closest('.accordion__item').classList.toggle('is-open', open);
+    syncScrollBtn();
+  });
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRADA 순위조회</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="prada.css?v=20261030s">
+<style>
+/* =========================================================
+   4. 화면 — 순위조회 (입력 카드 → 키워드 탭 → 결과 표)
+   ========================================================= */
+.view.rank-view { gap: 10px; padding: 0; }
+/* 검색 입력 카드: 패딩 20/20/30/20, 1px Border/Disabled, 간격 24 (그림자 없음) */
+.rank-card {
+  display: flex; flex-direction: column; gap: 24px; margin: 0 24px; padding: 19px 19px 29px;
+  background: var(--bg-surface); border: 1px solid var(--border-disabled);
+}
+.rank-card__title { color: var(--text-secondary); }
+.rank-card__body { display: flex; flex-direction: column; gap: 20px; }
+.rank-inputs { display: flex; align-items: flex-start; gap: 20px; }
+.rank-inputs > .field { width: 340px; }
+.rank-inputs .field__label { font-weight: 600; }
+.rank-kw { display: flex; align-items: flex-start; gap: 8px; }
+.rank-kw > div { flex: 1; min-width: 0; }
+.rank-kw .btn { flex: none; }
+.rank-list { display: flex; flex-direction: column; gap: 12px; }
+.rank-list__title { color: var(--text-secondary); }
+.rank-list .tag-list { min-height: 32px; }
+.rank-submit { align-self: flex-start; }
+
+/* 결과: Tab Bar(48, 좌우 24, 아래 1px Border/Secondary) 40 표 */
+.rank-result { display: flex; flex-direction: column; gap: 40px; }
+.rank-table-wrap { padding: 0 24px; }
+/* 표: 프로덕트 142 · 벤더 140 · 키워드 160 · 순위 160 · 월간 검색량 160 · 권장 구좌 120 · 상품명(남는 폭) · 상품 URL 80(Copy) */
+.rank-table .col-142 { width: 142px; }
+.rank-table .col-140 { width: 140px; }
+.rank-table .col-160 { width: 160px; }
+.rank-table .col-120 { width: 120px; }
+.rank-table .col-80 { width: 80px; }
+.rank-table td.col-80 { line-height: 0; }
+.rank-empty { justify-content: center; height: 233px; margin-top: -10px; padding: 0 20px; }   /* 시안 Empty State: 카드 바로 아래 233, 아이콘·문구 가운데 */
+.rank-empty p { text-align: center; white-space: pre-line; }
+
+@media (max-width: 767px) {
+  .view.rank-view { margin-top: -4px; }                 /* 모바일 시안: 제목 ↔ 카드 20 */
+  .rank-card { margin: 0; padding: 19px 19px 29px; }   /* 아래 30 (PC와 같음) */
+  .rank-empty { margin-top: 10px; }                     /* 카드 ↔ 빈 상태 20 */
+  .rank-inputs { flex-direction: column; gap: 20px; }
+  .rank-inputs > .field { width: 100%; }
+  .rank-submit { align-self: stretch; }
+  .tab-bar { padding: 0; }
+  .rank-table-wrap { padding: 0; }
+  .rank-result { gap: 20px; }
+  .rank-table { width: 1100px; }
+}
+</style>
+</head>
+<body data-prada-page="rank.html" data-prada-nav="none">
+
+<div class="app-body">
+  <main class="main">
+    <div class="page-header">
+      <h1 class="heading-1-semibold">순위조회</h1>
+      <p class="page-header__desc label-1-regular">상품의 키워드별 검색 순위를 조회할 수 있습니다.</p>
+    </div>
+    <div class="view rank-view" id="view">
+      <form class="rank-card" id="rankForm" novalidate>
+        <h2 class="rank-card__title body-1-semibold">검색 입력</h2>
+        <div class="rank-card__body">
+          <div class="rank-inputs">
+            <label class="field">
+              <span class="field__label label-1-regular">상품 URL</span>
+              <input class="text-input label-1-regular" id="urlInput" name="url" placeholder="상품 URL을 입력해주세요." inputmode="url">
+            </label>
+            <div class="field">
+              <label class="field__label label-1-regular" for="kwInput">키워드</label>
+              <div class="rank-kw">
+                <div><input class="text-input label-1-regular" id="kwInput" name="kw" placeholder="키워드를 입력해주세요"></div>
+                <button class="btn btn--lg btn--primary" type="button" id="kwAdd">추가</button>
+              </div>
+            </div>
+          </div>
+          <div class="rank-list">
+            <h3 class="rank-list__title body-3-semibold" id="kwListTitle">키워드 리스트</h3>
+            <ul class="tag-list" id="kwList" aria-labelledby="kwListTitle"></ul>
+          </div>
+          <button class="btn btn--lg btn--primary rank-submit" type="submit">순위조회</button>
+        </div>
+      </form>
+      <div id="result"></div>
+    </div>
+  </main>
+</div>
+
+<script src="prada.js?v=20261030s"></script>
+<script>
+(() => {
+  const { esc, icon, showToast, setInputError, clearInputError, syncScrollBtn } = Prada;   // prada.js
+  const seeded = (seed) => { let s = seed % 2147483647; if (s <= 0) s += 2147483646; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+  const hash = (str) => [...str].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 2147483647, 7);
+
+  const form = document.getElementById('rankForm');
+  const urlInput = document.getElementById('urlInput');
+  const kwInput = document.getElementById('kwInput');
+  const kwList = document.getElementById('kwList');
+  const result = document.getElementById('result');
+  let keywords = [];
+  let results = null;   // 조회 결과: [{ keyword, found, … }] — null = 조회 전
+  let tab = 0;
+
+  /* ---------------- 키워드 리스트 (Tag Filled) ---------------- */
+  function renderTags() {
+    kwList.innerHTML = keywords.map((k, i) => `
+      <li class="tag tag--filled">${esc(k)}<button class="tag__remove" type="button" data-kw-remove="${i}" aria-label="${esc(k)} 삭제">${icon('i-close', 16)}</button></li>`).join('');
+  }
+  function addKeyword() {
+    const v = kwInput.value.trim();
+    clearInputError(kwInput);
+    if (!v) { setInputError(kwInput, '키워드를 입력해주세요.'); kwInput.focus(); return; }
+    if (keywords.includes(v)) { setInputError(kwInput, '이미 추가된 키워드입니다.'); kwInput.focus(); return; }
+    keywords.push(v);
+    kwInput.value = '';
+    renderTags();
+    kwInput.focus();
+  }
+  document.getElementById('kwAdd').addEventListener('click', addKeyword);
+  kwInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addKeyword(); } });
+  kwInput.addEventListener('input', () => clearInputError(kwInput));
+  urlInput.addEventListener('input', () => clearInputError(urlInput));
+  kwList.addEventListener('click', (e) => {
+    const rm = e.target.closest('[data-kw-remove]');
+    if (!rm) return;
+    keywords.splice(Number(rm.dataset.kwRemove), 1);
+    renderTags();
+    kwInput.focus();
+  });
+
+  /* ---------------- 결과: 조회 전 · 키워드 탭 + 표 · 못 찾음 ---------------- */
+  const empty = (text) => `
+    <div class="empty-state rank-empty">
+      <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><path d="M2.87109 25.6209V7.97985C2.87109 7.27804 3.14928 6.6042 3.64554 6.10794C4.1418 5.61168 4.81563 5.3335 5.51745 5.3335H12.9389L16.4671 8.8617H26.6867C27.3885 8.86171 28.0615 9.1407 28.5578 9.63695C29.0539 10.1332 29.333 10.8063 29.333 11.5081V25.6209C29.333 26.3226 29.054 26.9957 28.5578 27.492C28.0615 27.9882 27.3884 28.2672 26.6867 28.2672H5.51745C4.81563 28.2672 4.14179 27.9882 3.64554 27.492C3.14941 26.9957 2.87112 26.3226 2.87109 25.6209ZM20.2537 15.6597L17.3489 18.5636L20.2537 21.4684L19.6303 22.0927L19.006 22.7161L16.1012 19.8113L13.1973 22.7161L11.9496 21.4684L14.8536 18.5636L11.9496 15.6597L12.5739 15.0363L13.1973 14.412L16.1012 17.316L19.006 14.412L20.2537 15.6597ZM4.63479 25.6209C4.63482 25.8547 4.72792 26.0789 4.89321 26.2443C5.05863 26.4097 5.28351 26.5027 5.51745 26.5027H26.6867C26.9206 26.5027 27.1447 26.4097 27.3101 26.2443C27.4755 26.0789 27.5685 25.8548 27.5685 25.6209V11.5081C27.5685 11.2741 27.4755 11.0492 27.3101 10.8838C27.1447 10.7185 26.9205 10.6254 26.6867 10.6254H15.7362L12.208 7.09719H5.51745C5.28351 7.09719 5.05863 7.19019 4.89321 7.35561C4.72779 7.52103 4.63479 7.74591 4.63479 7.97985V25.6209Z" fill="#9E9E9E"/></svg>
+      <p class="body-1-regular">${text}</p>
+    </div>`;
+  function renderResult() {
+    if (!results) { result.innerHTML = empty('아직 순위 조회 된 데이터가 없습니다'); return; }
+    if (!results.some((r) => r.found)) { result.innerHTML = empty('순위를 조회했으나\n순위권에서 상품을 찾을 수 없습니다'); return; }
+    const r = results[tab];
+    result.innerHTML = `
+      <div class="rank-result">
+        <div class="tab-bar" role="tablist" aria-label="키워드">
+          ${results.map((x, i) => `<button class="tab-item" type="button" role="tab" id="rtab-${i}" aria-selected="${i === tab}" aria-controls="rpanel" tabindex="${i === tab ? 0 : -1}" data-tab="${i}">${esc(x.keyword)}</button>`).join('')}
+        </div>
+        <div class="rank-table-wrap" id="rpanel" role="tabpanel" aria-labelledby="rtab-${tab}">
+          <div class="table-scroll">
+            <table class="table rank-table">
+              <thead><tr>
+                <th class="col-142">프로덕트</th><th class="col-140">벤더</th><th class="col-160">키워드</th><th class="col-160">순위</th>
+                <th class="col-160">월간 검색량</th><th class="col-120">권장 구좌</th><th>상품명</th><th class="col-80">상품 URL</th>
+              </tr></thead>
+              <tbody>${r.found ? `
+                <tr>
+                  <td>${r.productId}</td><td>${r.vendorId}</td><td>${esc(r.keyword)}</td><td>${r.rank}위</td>
+                  <td>${r.volume.toLocaleString()}</td><td>${r.slots}</td><td>${esc(r.product)}</td>
+                  <td class="col-80"><button class="cell-icon-btn" type="button" data-copy aria-label="상품 URL 복사">${icon('i-copy')}</button></td>
+                </tr>` : '<tr><td class="table__empty" colspan="8">이 키워드의 순위권에서 상품을 찾을 수 없습니다.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+  }
+  result.addEventListener('click', async (e) => {
+    const t = e.target.closest('[data-tab]');
+    if (t) { tab = Number(t.dataset.tab); renderResult(); result.querySelector(`[data-tab="${tab}"]`).focus(); return; }
+    if (e.target.closest('[data-copy]')) {
+      try { await navigator.clipboard.writeText(results[tab].url); } catch (err) { /* 미리보기 등 클립보드 권한이 없으면 무시 */ }
+      showToast('success', '상품 URL이 복사되었습니다.');
+    }
+  });
+  // 탭: ← → 로 이동
+  result.addEventListener('keydown', (e) => {
+    if (!e.target.closest('[data-tab]') || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    tab = (tab + (e.key === 'ArrowRight' ? 1 : -1) + results.length) % results.length;
+    renderResult();
+    result.querySelector(`[data-tab="${tab}"]`).focus();
+  });
+
+  /* ---------------- 순위조회 ---------------- */
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const url = urlInput.value.trim();
+    [urlInput, kwInput].forEach(clearInputError);
+    if (!/^https?:\/\/\S+$/.test(url)) { setInputError(urlInput, url ? '올바른 URL을 입력해주세요.' : '상품 URL을 입력해주세요.'); urlInput.focus(); return; }
+    if (kwInput.value.trim()) addKeyword();   // 입력만 하고 [추가]를 안 눌렀으면 넣어 준다
+    if (!keywords.length) { setInputError(kwInput, '키워드를 추가해주세요.'); kwInput.focus(); return; }
+    const pid = (url.match(/(\d{6,})/) || [])[1] || String(8853725586);
+    // 시안용 예시: URL·키워드로 정한 결과. 키워드에 "없음"이 들어가면 순위권 밖
+    results = keywords.map((k) => {
+      const r = seeded(hash(url + k));
+      return {
+        keyword: k, found: !k.includes('없음'), url, productId: pid, vendorId: String(92800196049 + Math.floor(r() * 50)),
+        rank: 1 + Math.floor(r() * 40), volume: Math.round(1000 + r() * 90000), slots: 5 + Math.floor(r() * 30),
+        product: `광동 ${k} 가수분해물 식약처인증 광동 제조 5개월분 종근당사은품증정`
+      };
+    });
+    tab = Math.max(0, results.findIndex((x) => x.found));
+    renderResult();
+    syncScrollBtn();
+  });
+
+  renderResult();
+  document.getElementById('view').classList.add('is-entering');   // 화면 진입 페이드
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRADA 일별마감</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="prada.css?v=20261030s">
+<style>
+/* =========================================================
+   4. 화면 — 일별마감 (목록 템플릿·기간 선택·컴포넌트는 prada.css)
+   ========================================================= */
+.daily-metric { margin-bottom: 16px; }                  /* 현황 ↔ 검색 40 */
+/* 표: 6칸 균등 (일자 · 발주일수 · 연장일수 · 환불일수 · 일수합계 · 기간합계) */
+.daily-table { table-layout: fixed; }
+
+@media (max-width: 767px) {
+  .daily-metric { margin-bottom: 0; }
+  .daily-metric .metric__item:first-child { width: 100%; }   /* 조회 기간 한 줄 → 2×2 */
+  .daily-table { width: 1692px; }            /* 모바일 시안: PC와 같은 칸 폭(282), 가로 스크롤 */
+}
+</style>
+</head>
+<body data-prada-page="daily.html">
+
+<div class="app-body">
+  <main class="main">
+    <div class="page-header">
+      <h1 class="heading-1-semibold">일별마감</h1>
+      <p class="page-header__desc label-1-regular">당월의 정산 상세 정보를 조회할 수 있습니다.</p>
+    </div>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+
+<script src="prada.js?v=20261030s"></script>
+<script>
+(() => {
+  const { icon, showToast, syncScrollBtn, mountSelect, searchBarHTML, syncSearchClear, listNavHTML } = Prada;   // prada.js
+  const { ymd } = Prada.period;
+  // 권한별 검색 분류: 마스터 = 총판사·대행사·광고주 / 총판·대행사 = 대행사·광고주 / 일반(광고주) = 광고주
+  const ORG_COLS = Prada.role === 'advertiser' ? ['advertiser'] : Prada.isAgency ? ['agency', 'advertiser'] : ['distributor', 'agency', 'advertiser'];
+  const ORG_LABEL = { distributor: '총판사', agency: '대행사', advertiser: '광고주' };
+
+  /* ---------------- 데이터: 정산 건(시안용 예시) → 일자별로 모은다 ---------------- */
+  const seeded = (seed) => { let s = seed % 2147483647; if (s <= 0) s += 2147483646; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+  const TODAY = (() => { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })();
+  const DISTRIBUTORS = ['총판컴퍼니', '프라다미디어'];
+  const AGENCIES = ['company', '헤르메스애드', '블루마케팅'];
+  const ADVERTISERS = ['asdf', 'our1', 'a123456', 'pullim', 'prime1234', 'adflex', 'lifetone12'];
+  const logs = [];
+  (() => {
+    const r = seeded(23);
+    for (let d = 0; d < 160; d++) {
+      const date = ymd(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - d));
+      const n = d % 9 === 4 ? 0 : 1 + Math.floor(r() * 8);   // 정산이 없는 날도 있다
+      for (let k = 0; k < n; k++) {
+        const x = r();
+        logs.push({
+          date, type: x < 0.55 ? 'new' : x < 0.8 ? 'extend' : 'refund',
+          days: (1 + Math.floor(r() * 3)) * [10, 20, 30][Math.floor(r() * 3)] * (5 + Math.floor(r() * 20)),
+          distributor: DISTRIBUTORS[Math.floor(r() * DISTRIBUTORS.length)],
+          agency: AGENCIES[Math.floor(r() * AGENCIES.length)],
+          advertiser: ADVERTISERS[Math.floor(r() * ADVERTISERS.length)]
+        });
+      }
+    }
+  })();
+
+  /* ---------------- 상태 ---------------- */
+  // 빠른 기간: 이번 달 포함 최근 5개월 (시안: 9월/8월/7월/6월/5월), 기본 = 이번 달 ("당월")
+  const QUICK = Prada.period.months(5);
+  const state = {
+    from: ymd(QUICK[0].range[0]), to: ymd(QUICK[0].range[1]), quick: QUICK[0].key,
+    page: 1, pageSize: 50, field: 'all', query: ''
+  };
+  const view = document.getElementById('view');
+  const d = (n) => `${n.toLocaleString()}일`;
+
+  // 일자별: 발주·연장·환불 일수, 일수합계 = 발주 + 연장 − 환불, 기간합계 = 최근 일자부터 그 날까지 일수합계 누적 (시안)
+  function dailyRows() {
+    const q = state.query.trim().toLowerCase();
+    const hit = (l) => !q || (state.field === 'all' ? ORG_COLS : [state.field]).some((c) => l[c].toLowerCase().includes(q));
+    const days = [];
+    for (let t = new Date(`${state.to}T00:00:00`); ymd(t) >= state.from; t = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1)) {
+      if (t > TODAY) continue;
+      days.push(ymd(t));
+    }
+    let acc = 0;
+    return days.map((date) => {
+      const list = logs.filter((l) => l.date === date && hit(l));
+      const sum = (type) => list.filter((l) => l.type === type).reduce((a, l) => a + l.days, 0);
+      const [n, e, r] = [sum('new'), sum('extend'), sum('refund')];
+      acc += n + e - r;
+      return { date, n, e, r, total: n + e - r, acc };
+    });
+  }
+
+  function metricHTML(rows) {
+    const [n, e, r] = ['n', 'e', 'r'].map((k) => rows.reduce((a, x) => a + x[k], 0));
+    const item = (v, l) => `
+      <div class="metric__item">
+        <strong class="metric__value title-semibold">${v}</strong>
+        <span class="metric__label body-3-regular">${l}</span>
+      </div>`;
+    return `
+      <section class="metric daily-metric" aria-labelledby="metricTitle">
+        <h2 class="metric__title heading-2-semibold" id="metricTitle">검색 결과</h2>
+        <div class="metric__items">
+          ${item(`${state.from} ~ ${state.to}`, '조회 기간')}<span class="metric__divider"></span>
+          ${item(n.toLocaleString(), '발주 일수')}<span class="metric__divider"></span>
+          ${item(e.toLocaleString(), '연장 일수')}<span class="metric__divider"></span>
+          ${item(r.toLocaleString(), '환불 일수')}<span class="metric__divider"></span>
+          ${item((n + e - r).toLocaleString(), '일수 합계')}
+        </div>
+      </section>`;
+  }
+
+  function renderList() {
+    const rows = dailyRows();
+    const totalPages = Math.max(1, Math.ceil(rows.length / state.pageSize));
+    state.page = Math.min(state.page, totalPages);
+    const pageRows = rows.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
+
+    view.innerHTML = `
+      ${metricHTML(rows)}
+      ${searchBarHTML(state.query)}
+      <div class="list-block">
+        <div class="toolbar toolbar--period">
+          ${Prada.period.html(state, QUICK)}
+          <button class="btn btn--lg btn--line" type="button" data-act="excel">${icon('i-download', 16)}엑셀 저장</button>
+        </div>
+        <div class="table-scroll">
+          <table class="table daily-table">
+            <thead><tr><th>일자</th><th>발주일수</th><th>연장일수</th><th>환불일수</th><th>일수합계</th><th>기간합계</th></tr></thead>
+            <tbody>
+              ${pageRows.length ? pageRows.map((x) => `
+                <tr><td>${x.date}</td><td>${d(x.n)}</td><td>${d(x.e)}</td><td>${d(x.r)}</td><td>${d(x.total)}</td><td>${d(x.acc)}</td></tr>`).join('')
+                : '<tr><td class="table__empty" colspan="6">검색 결과가 없습니다.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ${listNavHTML(state.page, totalPages)}`;
+
+    mountSelect(view.querySelector('[data-select="field"]'),
+      [{ value: 'all', label: '전체' }, ...ORG_COLS.map((c) => ({ value: c, label: ORG_LABEL[c] }))],
+      state.field, (v) => { state.field = v; });
+    mountSelect(view.querySelector('[data-select="size"]'),
+      [10, 30, 50].map((n) => ({ value: String(n), label: `${n}개씩 보기` })),
+      String(state.pageSize), (v) => { state.pageSize = Number(v); state.page = 1; renderList(); });
+    syncScrollBtn();
+  }
+
+  /* ---------------- 기간 (prada.js Prada.period) ---------------- */
+  Prada.period.bind(view, () => state, QUICK, (from, to, quick) => {
+    Object.assign(state, { from, to, quick, page: 1 });
+    renderList();
+  });
+
+  view.addEventListener('click', (e) => {
+    if (e.target.closest('#searchClear')) {
+      view.querySelector('#searchInput').value = '';
+      if (state.query) { state.query = ''; state.page = 1; renderList(); } else syncSearchClear();
+      view.querySelector('#searchInput').focus();
+      return;
+    }
+    const pageBtn = e.target.closest('.pagination [data-page]');
+    if (pageBtn && !pageBtn.disabled) { state.page = Number(pageBtn.dataset.page); renderList(); return; }
+    if (e.target.closest('[data-act="excel"]')) exportCSV();
+  });
+  view.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (e.target.id === 'searchForm') {
+      state.query = view.querySelector('#searchInput').value; state.page = 1; renderList();
+    } else if (e.target.id === 'gotoForm') {
+      const total = Math.max(1, Math.ceil(dailyRows().length / state.pageSize));
+      const p = parseInt(view.querySelector('#gotoInput').value, 10);
+      state.page = Number.isFinite(p) ? Math.min(Math.max(p, 1), total) : state.page;
+      renderList();
+    }
+  });
+
+  /* ---------------- 엑셀 저장 (조회 결과 전체, CSV) ---------------- */
+  function exportCSV() {
+    const rows = dailyRows();
+    if (!rows.length) { showToast('error', '저장할 일별마감 데이터가 없습니다.'); return; }
+    const head = ['일자', '발주일수', '연장일수', '환불일수', '일수합계', '기간합계'];
+    const cell = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = '﻿' + [head, ...rows.map((x) => [x.date, x.n, x.e, x.r, x.total, x.acc])].map((r) => r.map(cell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `일별마감_${state.from.replace(/-/g, '')}-${state.to.replace(/-/g, '')}.csv` });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  renderList();
+  view.classList.add('is-entering');   // 화면 진입 페이드
+})();
+</script>
+</body>
+</html>

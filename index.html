@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRADA</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="prada.css?v=20261030s">
+<style>
+/* =========================================================
+   첫 화면 — 권한 선택 (Figma 8164:34347)
+   로고 132×28 → 62 → [마스터][총판][대행사][광고주(일반)][순위조회] (Button Primary Large 240, 간격 14), 화면 가운데
+   ========================================================= */
+body { background: var(--bg-surface); }
+.entry { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 62px; padding: 40px 20px; }
+.entry__logo svg { display: block; width: 132px; height: 28px; }
+.entry__roles { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+.entry__roles .btn { width: 240px; }
+.view.is-entering, .entry { animation: fade-in var(--motion-enter) both; }
+
+@media (max-width: 767px) {
+  .entry { gap: 40px; }
+  .entry__roles { flex-direction: column; width: 100%; max-width: 320px; gap: 8px; }
+  .entry__roles .btn { width: 100%; }
+}
+</style>
+</head>
+<body>
+<main class="entry">
+  <h1 class="entry__logo" aria-label="PRADA">
+    <svg viewBox="0 0 132 28" fill="none" aria-hidden="true">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M12.0469 0C17.2783 0 22 3.47664 22 10.1484C21.9996 16.4538 17.2889 19.9727 12.0469 19.9727H5.31836V25.2461C5.31798 26.9995 4.18849 28 2.73438 28C1.41068 27.9996 0.000479557 26.9992 0 25.2461V2.76562L0.0117188 2.75391C0.0121917 1.44131 1.05334 0 2.74609 0H12.0469ZM5.31836 14.9688H12.0469C14.7494 14.9688 16.877 12.6117 16.877 10.1367C16.8769 7.33891 14.7385 5.02539 12.0469 5.02539H5.31836V14.9688Z" fill="#1B2A41"/>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M90.1426 0C108.762 0.000175919 108.355 28 90.5039 28H80.8105C79.4712 28 78 27.2694 78 25.4922V2.50781C78 1.04678 79.4712 2.7824e-05 80.8105 0H90.1426ZM83.3691 23.0605H90.1309C101.131 23.0605 101.614 4.93945 90.1309 4.93945H83.3691V23.0605Z" fill="#1B2A41"/>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M36.6445 0C46.4974 0.000680147 48.5141 13.7262 40.291 17.1523L45.4531 23.6895C47.4686 26.7997 43.4355 29.7795 41.1055 26.7129L35.2539 17.9902H29.1621V25.3086C29.1621 28.8216 24 28.9412 24 25.3848V2.45898C24 1.0451 25.0449 6.61141e-05 26.3301 0H36.6445ZM29.1621 13.3555H36.6445C41.6802 13.3546 41.9935 4.88359 36.6445 4.88281H29.1621V13.3555Z" fill="#1B2A41"/>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M59.6465 1.62109C60.7105 -0.502451 63.5514 -0.577936 64.541 1.62109L75.6699 24.0645C77.2869 27.1798 72.5109 29.6691 71.0957 26.543L69.3613 23.0195H54.7949L53.0918 26.543C52.4641 27.9009 50.997 28.1824 49.582 27.9023C48.3162 27.1802 47.5274 25.746 48.3145 24.0645L59.6465 1.62109ZM57.252 17.7363H66.5625L62.1035 7.85156L57.252 17.7363Z" fill="#1B2A41"/>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M115.646 1.62109C116.711 -0.502445 119.551 -0.577934 120.541 1.62109L131.67 24.0645C133.287 27.1798 128.511 29.6691 127.096 26.543L125.361 23.0195H110.795L109.092 26.543C108.464 27.9009 106.997 28.1824 105.582 27.9023C104.316 27.1802 103.527 25.746 104.314 24.0645L115.646 1.62109ZM113.252 17.7363H122.562L118.104 7.85156L113.252 17.7363Z" fill="#1B2A41"/>
+    </svg>
+  </h1>
+  <nav class="entry__roles" aria-label="권한 선택">
+    <button class="btn btn--lg btn--primary" type="button" data-role="master">마스터</button>
+    <button class="btn btn--lg btn--primary" type="button" data-role="distributor">총판</button>
+    <button class="btn btn--lg btn--primary" type="button" data-role="agency">대행사</button>
+    <button class="btn btn--lg btn--primary" type="button" data-role="advertiser">광고주(일반)</button>
+    <button class="btn btn--lg btn--primary" type="button" data-go="rank.html">순위조회</button>
+  </nav>
+</main>
+<script>
+(() => {
+  // 고른 권한으로 PRADA에 들어간다 (시안용 데모 세션). 각 화면은 prada.js가 이 권한에 맞는 메뉴·기능만 보여 준다.
+  const SESSION_KEY = 'prada.session';
+  const DEMO_ID = { master: 'admin123', distributor: 'dist01', agency: 'agency01', advertiser: 'adv01' };
+  document.querySelector('.entry__roles').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.go) { try { sessionStorage.removeItem(SESSION_KEY); } catch (err) {} location.href = b.dataset.go; return; }   // 순위조회는 권한과 무관한 별도 어드민
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: DEMO_ID[b.dataset.role], role: b.dataset.role })); } catch (err) {}
+    location.href = 'notice.html';
+  });
+})();
+</script>
+</body>
+</html>

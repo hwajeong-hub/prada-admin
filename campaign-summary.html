@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRADA 캠페인 요약</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="prada.css?v=20261030s">
+<style>
+/* =========================================================
+   4. 화면 — 캠페인 요약 (목록 템플릿·기간 선택·컴포넌트는 prada.css)
+   ========================================================= */
+.summary-metric { margin-bottom: 16px; }                 /* 현황 ↔ 목록 40 */
+/* 기간 + 검색 한 줄 (간격 10) */
+.summary-toolbar { justify-content: flex-start; gap: 10px; }
+.summary-toolbar .search { flex: none; }
+/* 표: 9칸 균등 */
+.summary-table { table-layout: fixed; }
+
+@media (max-width: 767px) {
+  .summary-metric { margin-bottom: 0; }
+  .summary-metric .metric__item:first-child { width: 100%; }   /* 등록된 광고수 한 줄 → 아래 2칸 */
+  /* 모바일 순서: 날짜 → 검색 → 빠른 기간(6칸 균등) */
+  .summary-toolbar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .summary-toolbar .period { display: contents; }
+  .summary-toolbar .period__quick { display: flex; order: 3; }
+  .summary-toolbar .period__quick .btn { flex: 1 1 0; width: auto; min-width: 0; }
+  .summary-toolbar .search { order: 2; }
+  .summary-table { width: 1040px; }
+}
+</style>
+</head>
+<body data-prada-page="campaign-summary.html">
+
+<div class="app-body">
+  <main class="main">
+    <div class="page-header">
+      <h1 class="heading-1-semibold">캠페인 요약</h1>
+      <p class="page-header__desc label-1-regular">일자별 캠페인 소진 현황을 확인할 수 있습니다.</p>
+    </div>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+
+<script src="prada.js?v=20261030s"></script>
+<script src="campaign-data.js?v=20261030s"></script>
+<script>
+(() => {
+  const { esc, syncScrollBtn, mountSelect, searchBarHTML, syncSearchClear, listNavHTML } = Prada;   // prada.js
+  const { campaigns, daily } = CampaignData;                                                          // campaign-data.js
+  const { ymd } = Prada.period;
+
+  // 빠른 기간: 오늘 · 1일전 · 이번 달 포함 최근 4개월 (시안: 오늘/1일전/7월/6월/5월/4월), 기본 = 이번 달 (일자별 표라서)
+  const QUICK = [...Prada.period.days(), ...Prada.period.months(4)];
+  const state = {
+    from: ymd(QUICK[2].range[0]), to: ymd(QUICK[2].range[1]), quick: QUICK[2].key,
+    page: 1, pageSize: 50, field: 'all', query: ''
+  };
+  const view = document.getElementById('view');
+  const num = (n) => n.toLocaleString();
+  const pct = (a, b) => `${(b ? (a / b) * 100 : 0).toFixed(2)}%`;   // CVR·CTR (지면 호출 기준)
+
+  function filtered() {
+    const q = state.query.trim();
+    return daily.filter((d) => d.date >= state.from && d.date <= state.to && (!q || d.date.includes(q)));
+  }
+
+  function metricHTML() {
+    const t = daily[0];
+    const item = (v, l) => `
+      <div class="metric__item">
+        <strong class="metric__value title-semibold">${num(v)}</strong>
+        <span class="metric__label body-3-regular">${l}</span>
+      </div>`;
+    return `
+      <section class="metric summary-metric" aria-labelledby="metricTitle">
+        <h2 class="metric__title heading-2-semibold" id="metricTitle">검색 결과</h2>
+        <div class="metric__items">
+          ${item(campaigns.length, '등록된 광고수')}<span class="metric__divider"></span>
+          ${item(t.target, '오늘 소진 목표량')}<span class="metric__divider"></span>
+          ${item(t.used, '오늘 소진 횟수')}
+        </div>
+      </section>`;
+  }
+
+  function renderList() {
+    const rows = filtered();
+    const totalPages = Math.max(1, Math.ceil(rows.length / state.pageSize));
+    state.page = Math.min(state.page, totalPages);
+    const pageRows = rows.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
+    const HEAD = ['일자', '네이버 쇼핑 소진 목표', '네이버 쇼핑 소진 횟수', '네이버 쇼핑 오답', '네이버 쇼핑 유니크 참여', '네이버 쇼핑 모두 소진', '지면 호출 횟수', 'CVR', 'CTR'];
+
+    view.innerHTML = `
+      ${metricHTML()}
+      <div class="list-block">
+        <div class="toolbar toolbar--period summary-toolbar">
+          ${Prada.period.html(state, QUICK)}
+          ${searchBarHTML(state.query)}
+        </div>
+        <div class="table-scroll">
+          <table class="table summary-table">
+            <thead><tr>${HEAD.map((h) => `<th>${h}</th>`).join('')}</tr></thead>
+            <tbody>
+              ${pageRows.length ? pageRows.map((d) => `
+                <tr>
+                  <td>${d.date}</td><td>${num(d.target)}</td><td>${num(d.used)}</td><td>${num(d.wrong)}</td>
+                  <td>${num(d.unique)}</td><td>${num(d.exhausted)}</td><td>${num(d.calls)}</td>
+                  <td>${pct(d.used, d.calls)}</td><td>${pct(d.unique, d.calls)}</td>
+                </tr>`).join('') : '<tr><td class="table__empty" colspan="9">검색 결과가 없습니다.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ${listNavHTML(state.page, totalPages)}`;
+
+    mountSelect(view.querySelector('[data-select="field"]'),
+      [{ value: 'all', label: '전체' }, { value: 'date', label: '일자' }],
+      state.field, (v) => { state.field = v; });
+    mountSelect(view.querySelector('[data-select="size"]'),
+      [10, 30, 50].map((n) => ({ value: String(n), label: `${n}개씩 보기` })),
+      String(state.pageSize), (v) => { state.pageSize = Number(v); state.page = 1; renderList(); });
+    syncScrollBtn();
+  }
+
+  Prada.period.bind(view, () => state, QUICK, (from, to, quick) => {
+    Object.assign(state, { from, to, quick, page: 1 });
+    renderList();
+  });
+  view.addEventListener('click', (e) => {
+    if (e.target.closest('#searchClear')) {
+      view.querySelector('#searchInput').value = '';
+      if (state.query) { state.query = ''; state.page = 1; renderList(); } else syncSearchClear();
+      view.querySelector('#searchInput').focus();
+      return;
+    }
+    const pageBtn = e.target.closest('.pagination [data-page]');
+    if (pageBtn && !pageBtn.disabled) { state.page = Number(pageBtn.dataset.page); renderList(); }
+  });
+  view.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (e.target.id === 'searchForm') {
+      state.query = view.querySelector('#searchInput').value; state.page = 1; renderList();
+    } else if (e.target.id === 'gotoForm') {
+      const total = Math.max(1, Math.ceil(filtered().length / state.pageSize));
+      const p = parseInt(view.querySelector('#gotoInput').value, 10);
+      state.page = Number.isFinite(p) ? Math.min(Math.max(p, 1), total) : state.page;
+      renderList();
+    }
+  });
+
+  renderList();
+  view.classList.add('is-entering');   // 화면 진입 페이드
+})();
+</script>
+</body>
+</html>

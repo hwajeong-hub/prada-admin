@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRADA 정산로그</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="prada.css?v=20261030s">
+<style>
+/* =========================================================
+   4. 화면 — 정산로그 (목록 템플릿·컴포넌트는 prada.css)
+   ========================================================= */
+.settle-metric { margin-bottom: 16px; }                 /* 현황 ↔ 검색 40 (view gap 24 + 16) */
+.settle-metric .metric__item:first-child { cursor: default; }
+
+
+/* 표: No 142 · 구분 140 · 총판사 160 · 대행사 160 · 광고주 160 · 수량 120 · 기간 120 · 일수합계 120 · 생성일시(남는 폭) · 시작일 240 · 관리 56 */
+.settle-table .col-no { width: 142px; }
+.settle-table .col-type { width: 140px; }
+.settle-table .col-org { width: 160px; }
+.settle-table .col-120 { width: 120px; }
+.settle-table .col-start { width: 240px; }
+.settle-table .col-icon { width: 56px; padding: 0 12px; }
+.settle-table td.col-icon { line-height: 0; }
+/* Type Badge (구분): Label 2/SemiBold, 배경 없음 — 신규 Dark Green · 연장 Blue · 환불 Red */
+.type-badge { font: 600 12px/16px var(--font-family); letter-spacing: var(--letter-spacing); }
+.type-badge--new { color: var(--badge-dark-green); }
+.type-badge--extend { color: var(--badge-blue); }
+.type-badge--refund { color: var(--badge-red); }
+
+/* 삭제 로그 (Modal / Dialog 940): 표 머리 34 · 행 36 */
+.dialog--log { width: 940px; }
+.log-table { table-layout: fixed; }
+.log-table td { height: 36px; }
+.log-table td.col-name { text-align: left; overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 767px) {
+  .settle-metric { margin-bottom: 0; }
+  /* Metric Card (Mobile): 조회 기간 한 줄 꽉 → 아래 2×2 */
+  .settle-metric .metric__item:first-child { width: 100%; }
+  .settle-table .col-no, .settle-table .col-type { width: 80px; }   /* 모바일 시안: No 80 · 구분 80 · 소속 100 */
+  .settle-table .col-org { width: 100px; }
+  .dialog.dialog--log { width: 340px; }
+  .log-table { width: max-content; }
+}
+</style>
+</head>
+<body data-prada-page="settle.html">
+
+<div class="app-body">
+  <main class="main">
+    <div class="page-header">
+      <h1 class="heading-1-semibold">정산로그</h1>
+      <p class="page-header__desc label-1-regular">정산과 관련된 상세 정보를 조회할 수 있습니다.</p>
+    </div>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+
+<!-- 삭제 로그 (Modal / Dialog 940) -->
+<div class="modal" id="logModal" hidden>
+  <div class="dialog dialog--log" role="dialog" aria-modal="true" aria-labelledby="logTitle" tabindex="-1">
+    <h2 class="dialog__header body-1-semibold" id="logTitle">삭제 로그</h2>
+    <div class="table-scroll"><table class="table log-table" id="logTable"></table></div>
+    <div class="cta"><button class="btn btn--md btn--line" type="button" data-log-close>닫기</button></div>
+    <button class="dialog__close" type="button" aria-label="닫기" data-log-close><svg width="20" height="20"><use href="#i-close"/></svg></button>
+  </div>
+</div>
+
+<script src="prada.js?v=20261030s"></script>
+<script>
+(() => {
+  const { esc, icon, showToast, syncScrollBtn,
+          mountSelect, searchBarHTML, syncSearchClear, listNavHTML } = Prada;   // prada.js
+  // 권한별 열: 마스터 = 총판사·대행사·광고주 / 총판·대행사 = 대행사·광고주 / 일반(광고주) = 광고주
+  const ORG_COLS = Prada.role === 'advertiser' ? ['advertiser'] : Prada.isAgency ? ['agency', 'advertiser'] : ['distributor', 'agency', 'advertiser'];
+  const ORG_LABEL = { distributor: '총판사', agency: '대행사', advertiser: '광고주' };
+
+  /* ---------------- 데이터 (시안용 예시) ---------------- */
+  const seeded = (seed) => { let s = seed % 2147483647; if (s <= 0) s += 2147483646; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+  const pad = (n) => String(n).padStart(2, '0');
+  const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const parse = (s) => new Date(`${s}T00:00:00`);
+  const TODAY = (() => { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })();
+
+  const TYPES = { new: '신규', extend: '연장', refund: '환불' };
+  const DISTRIBUTORS = ['총판컴퍼니', '프라다미디어'];
+  const AGENCIES = ['company', '헤르메스애드', '블루마케팅'];
+  const ADVERTISERS = ['asdf', 'our1', 'a123456', 'pullim', 'prime1234', 'adflex', 'lifetone12'];
+  const PRODUCTS = ['블랑데코 가죽 가방끈 롱삼 르 플리아쥬 호환 리폼 파우치 미니 숄더 스트랩', '단단한 고당도 햇 사과 정품 3kg', '머슬아머 저주파 EMS 듀얼 손목 마사지기'];
+  const logs = [];
+  (() => {
+    const r = seeded(7);
+    let no = 33994;
+    for (let d = 0; d < 150; d++) {
+      const day = addDays(TODAY, -d);
+      const n = d === 0 ? 14 : 2 + Math.floor(r() * 5);
+      for (let k = 0; k < n; k++) {
+        const x = r();
+        const type = x < 0.55 ? 'new' : x < 0.8 ? 'extend' : 'refund';
+        const qty = 1 + Math.floor(r() * 3);
+        const days = [10, 20, 30][Math.floor(r() * 3)];
+        const created = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9 + Math.floor(r() * 9), Math.floor(r() * 60), Math.floor(r() * 60));
+        logs.push({
+          no: no--, type, qty, days, total: qty * days, created,
+          distributor: DISTRIBUTORS[Math.floor(r() * DISTRIBUTORS.length)],
+          agency: AGENCIES[Math.floor(r() * AGENCIES.length)],
+          advertiser: ADVERTISERS[Math.floor(r() * ADVERTISERS.length)],
+          start: fmt(addDays(day, 1))
+        });
+      }
+    }
+  })();
+  const createdText = (d) => `${fmt(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+  /* ---------------- 상태 ---------------- */
+  const state = {
+    from: fmt(TODAY), to: fmt(TODAY), quick: 'today',
+    page: 1, pageSize: 50, field: 'all', query: '',
+    filters: { type: null, distributor: null, agency: null, advertiser: null },
+    metric: null                                        // 현황 카드에서 고른 구분 (null = 전체)
+  };
+  // 빠른 기간: 오늘 · 1일전 · 이번 달 포함 최근 4개월 (시안: 오늘/1일전/7월/6월/5월/4월)
+  const QUICK = [...Prada.period.days(), ...Prada.period.months(4)];
+  const view = document.getElementById('view');
+
+  function inRange() {
+    const from = parse(state.from); const to = addDays(parse(state.to), 1);
+    return logs.filter((l) => l.created >= from && l.created < to);
+  }
+  function filtered() {
+    const q = state.query.trim().toLowerCase();
+    const f = state.filters;
+    return inRange().filter((l) =>
+      (!state.metric || l.type === state.metric) &&
+      (!f.type || f.type.has(TYPES[l.type])) &&
+      ORG_COLS.every((c) => !f[c] || f[c].has(l[c])) &&
+      (!q || (state.field === 'all' ? ORG_COLS : [state.field]).some((c) => l[c].toLowerCase().includes(q))));
+  }
+
+  /* ---------------- 현황 카드 "검색 결과" ---------------- */
+  // 발주·연장·환불 일수 = 그 구분의 일수합계 합, 일수 합계 = 발주 + 연장 − 환불. 항목을 누르면 표가 그 구분으로 (일수 합계 = 전체)
+  function metricHTML() {
+    const list = inRange();
+    const sum = (t) => list.filter((l) => l.type === t).reduce((a, l) => a + l.total, 0);
+    const [n, e, r] = [sum('new'), sum('extend'), sum('refund')];
+    const item = (value, label, key) => {
+      const on = key !== undefined && state.metric === key;
+      return `<button class="metric__item ${on ? 'metric__item--highlight' : ''}" type="button" data-metric="${key || ''}" aria-pressed="${on}" aria-label="${label}${key ? ` (${TYPES[key]}만 보기)` : ' (전체 보기)'}">
+        <strong class="metric__value title-semibold">${value.toLocaleString()}</strong>
+        <span class="metric__label body-3-regular">${label}</span>
+      </button>`;
+    };
+    return `
+      <section class="metric settle-metric" aria-labelledby="metricTitle">
+        <h2 class="metric__title heading-2-semibold" id="metricTitle">검색 결과</h2>
+        <div class="metric__items">
+          <div class="metric__item">
+            <strong class="metric__value title-semibold">${state.from} ~ ${state.to}</strong>
+            <span class="metric__label body-3-regular">조회 기간</span>
+          </div><span class="metric__divider"></span>
+          ${item(n, '발주 일수', 'new')}<span class="metric__divider"></span>
+          ${item(e, '연장 일수', 'extend')}<span class="metric__divider"></span>
+          ${item(r, '환불 일수', 'refund')}<span class="metric__divider"></span>
+          ${item(n + e - r, '일수 합계')}
+        </div>
+      </section>`;
+  }
+
+  const thFilter = (col, label, cls) => `
+    <th class="${cls} col-th-btn">
+      <button class="th-btn ${state.filters[col] ? 'is-active' : ''}" type="button" data-filter-col="${col}" aria-haspopup="dialog">${label}${icon('i-filter', 12)}</button>
+    </th>`;
+
+  function renderList() {
+    const rows = filtered();
+    const totalPages = Math.max(1, Math.ceil(rows.length / state.pageSize));
+    state.page = Math.min(state.page, totalPages);
+    const pageRows = rows.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
+    const cols = 8 + ORG_COLS.length;
+
+    view.innerHTML = `
+      ${metricHTML()}
+      ${searchBarHTML(state.query)}
+      <div class="list-block">
+        <div class="toolbar toolbar--period">
+          ${Prada.period.html(state, QUICK)}
+          <button class="btn btn--lg btn--line" type="button" data-act="excel">${icon('i-download', 16)}엑셀 저장</button>
+        </div>
+        <div class="table-scroll">
+          <table class="table settle-table">
+            <thead><tr>
+              <th class="col-no">No</th>
+              ${thFilter('type', '구분', 'col-type')}
+              ${ORG_COLS.map((c) => thFilter(c, ORG_LABEL[c], 'col-org')).join('')}
+              <th class="col-120">수량</th>
+              <th class="col-120">기간</th>
+              <th class="col-120">일수합계</th>
+              <th>생성일시</th>
+              <th class="col-start">시작일</th>
+              <th class="col-icon">관리</th>
+            </tr></thead>
+            <tbody>
+              ${pageRows.length ? pageRows.map((l) => `
+                <tr>
+                  <td class="col-no">${l.no}</td>
+                  <td><span class="type-badge type-badge--${l.type}">${TYPES[l.type]}</span></td>
+                  ${ORG_COLS.map((c) => `<td>${esc(l[c])}</td>`).join('')}
+                  <td>${l.qty}개</td>
+                  <td>${l.days}일</td>
+                  <td>${l.total}일</td>
+                  <td>${createdText(l.created)}</td>
+                  <td>${l.start}</td>
+                  <td class="col-icon">${l.type === 'extend' ? '' : `<button class="cell-icon-btn" type="button" data-log="${l.no}" aria-label="${l.no} 삭제 로그 보기">${icon('i-history')}</button>`}</td>
+                </tr>`).join('') : `<tr><td class="table__empty" colspan="${cols}">검색 결과가 없습니다.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ${listNavHTML(state.page, totalPages)}`;
+
+    mountSelect(view.querySelector('[data-select="field"]'),
+      [{ value: 'all', label: '전체' }, ...ORG_COLS.map((c) => ({ value: c, label: ORG_LABEL[c] }))],
+      state.field, (v) => { state.field = v; });
+    mountSelect(view.querySelector('[data-select="size"]'),
+      [10, 30, 50].map((n) => ({ value: String(n), label: `${n}개씩 보기` })),
+      String(state.pageSize), (v) => { state.pageSize = Number(v); state.page = 1; renderList(); });
+    syncScrollBtn();
+  }
+
+  /* ---------------- 기간 (prada.js Prada.period) ---------------- */
+  Prada.period.bind(view, () => state, QUICK, (from, to, quick) => {
+    Object.assign(state, { from, to, quick, page: 1 });
+    renderList();
+  });
+
+  view.addEventListener('click', (e) => {
+    if (e.target.closest('#searchClear')) {
+      view.querySelector('#searchInput').value = '';
+      if (state.query) { state.query = ''; state.page = 1; renderList(); } else syncSearchClear();
+      view.querySelector('#searchInput').focus();
+      return;
+    }
+    const pageBtn = e.target.closest('.pagination [data-page]');
+    if (pageBtn && !pageBtn.disabled) { state.page = Number(pageBtn.dataset.page); renderList(); return; }
+    const metric = e.target.closest('[data-metric]');
+    if (metric) {
+      state.metric = metric.dataset.metric || null;
+      state.page = 1;
+      renderList();
+      view.querySelector(`[data-metric="${state.metric || ''}"]`).focus({ preventScroll: true });
+      return;
+    }
+    const filterBtn = e.target.closest('[data-filter-col]');
+    if (filterBtn) {
+      const col = filterBtn.dataset.filterCol;
+      const values = col === 'type' ? Object.values(TYPES) : [...new Set(logs.map((l) => l[col]))];
+      Prada.filterPopover(filterBtn, {
+        options: values, selected: state.filters[col],
+        onApply: (set) => { state.filters[col] = set; state.page = 1; renderList(); }
+      });
+      return;
+    }
+    const log = e.target.closest('[data-log]');
+    if (log) { openLog(Number(log.dataset.log)); return; }
+    if (e.target.closest('[data-act="excel"]')) exportCSV();
+  });
+  view.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (e.target.id === 'searchForm') {
+      state.query = view.querySelector('#searchInput').value; state.page = 1; renderList();
+    } else if (e.target.id === 'gotoForm') {
+      const total = Math.max(1, Math.ceil(filtered().length / state.pageSize));
+      const p = parseInt(view.querySelector('#gotoInput').value, 10);
+      state.page = Number.isFinite(p) ? Math.min(Math.max(p, 1), total) : state.page;
+      renderList();
+    }
+  });
+
+  /* ---------------- 엑셀 저장 (조회 결과 전체, CSV) ---------------- */
+  function exportCSV() {
+    const rows = filtered();
+    if (!rows.length) { showToast('error', '저장할 정산로그가 없습니다.'); return; }
+    const head = ['No', '구분', ...ORG_COLS.map((c) => ORG_LABEL[c]), '수량', '기간', '일수합계', '생성일시', '시작일'];
+    const body = rows.map((l) => [l.no, TYPES[l.type], ...ORG_COLS.map((c) => l[c]), `${l.qty}개`, `${l.days}일`, `${l.total}일`, createdText(l.created), l.start]);
+    const cell = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = '﻿' + [head, ...body].map((r) => r.map(cell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `정산로그_${state.from.replace(/-/g, '')}-${state.to.replace(/-/g, '')}.csv` });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  /* ---------------- 삭제 로그 (Modal / Dialog 940) ---------------- */
+  const logModal = document.getElementById('logModal');
+  function openLog(no) {
+    const l = logs.find((x) => x.no === no);
+    const r = seeded(no);
+    const items = Array.from({ length: 10 }, () => {
+      const start = addDays(parse(l.start), -30 - Math.floor(r() * 20));
+      const end = addDays(start, l.days);
+      const req = addDays(start, 5 + Math.floor(r() * 15));
+      return { no, name: PRODUCTS[Math.floor(r() * PRODUCTS.length)], mid: String(8783472239 + Math.floor(r() * 90)), start: fmt(start), end: fmt(end), req: fmt(req), days: Math.round((end - req) / 864e5) };
+    });
+    document.getElementById('logTable').innerHTML = `
+      <colgroup><col style="width:110px"><col style="width:310px"><col style="width:100px"><col style="width:100px"><col style="width:100px"><col style="width:100px"><col style="width:80px"></colgroup>
+      <thead><tr><th>No</th><th>상품명</th><th>MID</th><th>시작일</th><th>종료일</th><th>환불요청일</th><th>환불일수</th></tr></thead>
+      <tbody>${items.map((i) => `
+        <tr><td>${i.no}</td><td class="col-name" title="${esc(i.name)}">${esc(i.name)}</td><td>${i.mid}</td><td>${i.start}</td><td>${i.end}</td><td>${i.req}</td><td>${i.days}</td></tr>`).join('')}
+      </tbody>`;
+    logModal.hidden = false;
+    logModal.querySelector('.dialog').focus();
+  }
+  function closeLog() { logModal.hidden = true; }
+  logModal.addEventListener('click', (e) => { if (e.target === logModal || e.target.closest('[data-log-close]')) closeLog(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLog(); });
+
+  renderList();
+  view.classList.add('is-entering');   // 화면 진입 페이드
+})();
+</script>
+</body>
+</html>

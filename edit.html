@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRADA 수정관리</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="prada.css?v=20261030s">
+<style>
+/* =========================================================
+   4. 화면 — 수정관리 (목록 템플릿·기간 선택·컴포넌트는 prada.css)
+   ========================================================= */
+/* 표: 수정시간 140 · 구분 120 · No 120 · 수정자 ID 120 · 대상자 ID 120 · 상품명(남는 폭) · 키워드 120 · 프로덕트 120 · 벤더 120 · 수정전 56 */
+.edit-table .col-time { width: 140px; }
+.edit-table .col-120 { width: 120px; }
+.edit-table .col-icon { width: 56px; padding: 0 12px; }
+.edit-table td.col-icon { line-height: 0; }
+.cell-link { color: var(--text-link); }
+.cell-link:hover { text-decoration: underline; }
+.cell-link:focus-visible { outline: 2px solid var(--border-brand); outline-offset: 2px; }
+
+/* 수정 전 데이터 (Modal / Dialog 940): 표 머리 34 · 행 36 */
+.dialog--before { width: 940px; }
+.before-table { table-layout: fixed; }
+.before-table td { height: 36px; }
+.before-table td.col-name { overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 767px) {
+  .edit-table .col-product { width: 300px; }
+  .dialog.dialog--before { width: 340px; }
+  .before-table { width: 900px; }
+}
+</style>
+</head>
+<body data-prada-page="edit.html">
+
+<div class="app-body">
+  <main class="main">
+    <div class="page-header">
+      <h1 class="heading-1-semibold">수정관리</h1>
+      <p class="page-header__desc label-1-regular">관리 중인 광고의 수정로그를 확인할 수 있습니다.</p>
+    </div>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+
+<!-- 수정 전 데이터 (Modal / Dialog 940) -->
+<div class="modal" id="beforeModal" hidden>
+  <div class="dialog dialog--before" role="dialog" aria-modal="true" aria-labelledby="beforeTitle" tabindex="-1">
+    <h2 class="dialog__header body-1-semibold" id="beforeTitle">수정 전 데이터</h2>
+    <div class="table-scroll"><table class="table before-table" id="beforeTable"></table></div>
+    <div class="cta"><button class="btn btn--md btn--line" type="button" data-before-close>닫기</button></div>
+    <button class="dialog__close" type="button" aria-label="닫기" data-before-close><svg width="20" height="20"><use href="#i-close"/></svg></button>
+  </div>
+</div>
+
+<script src="prada.js?v=20261030s"></script>
+<script>
+(() => {
+  const { esc, icon, showToast, syncScrollBtn, mountSelect, searchBarHTML, syncSearchClear, listNavHTML } = Prada;   // prada.js
+  const MASTER = !Prada.isAgency;   // 총판·대행사·광고주: [엑셀 저장] 없음 (시안)
+
+  /* ---------------- 데이터 (시안용 예시) ---------------- */
+  const seeded = (seed) => { let s = seed % 2147483647; if (s <= 0) s += 2147483646; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+  const pad = (n) => String(n).padStart(2, '0');
+  const { ymd } = Prada.period;
+  const TODAY = (() => { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })();
+  const parse = (s) => new Date(`${s}T00:00:00`);
+
+  const TYPES = { edit: '정보수정', new: '신규정보' };
+  const EDITORS = ['table123', 'admin01', 'prada', 'hermes'];
+  const TARGETS = ['green45', 'asdf', 'our1', 'pullim', 'prime1234', 'adflex'];
+  const PRODUCTS = [
+    ['수담 사계절 하찌 사선 가디건 5color 남녀공용', '4계절가디건'],
+    ['단단한 고당도 햇 사과 정품 3kg', '사과'],
+    ['머슬아머 저주파 EMS 듀얼 손목 마사지기', '손목마사지기'],
+    ['국내산 콘드로이친 1200 관절 영양제 60정', '콘드로이친']
+  ];
+  const logs = [];
+  (() => {
+    const r = seeded(19);
+    let no = 33994;
+    for (let d = 0; d < 160; d++) {
+      const day = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - d);
+      const n = 2 + Math.floor(r() * 5);
+      for (let k = 0; k < n; k++) {
+        const [product, keyword] = PRODUCTS[Math.floor(r() * PRODUCTS.length)];
+        const pid = String(8413844197 + Math.floor(r() * 900));
+        logs.push({
+          id: logs.length, no: no--, type: r() < 0.75 ? 'edit' : 'new',
+          time: new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9 + Math.floor(r() * 10), Math.floor(r() * 60)),
+          editor: EDITORS[Math.floor(r() * EDITORS.length)], target: TARGETS[Math.floor(r() * TARGETS.length)],
+          product, keyword, productId: pid, vendorId: String(91345228543 + Math.floor(r() * 50)),
+          url: `https://smartstore.naver.com/contentking/products/${pid}`
+        });
+      }
+    }
+  })();
+  const timeText = (d) => `${ymd(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const FIELDS = { editor: '수정자 ID', target: '대상자 ID', product: '상품명', keyword: '키워드' };
+
+  /* ---------------- 상태 ---------------- */
+  // 빠른 기간: 이번 달 포함 최근 5개월 (시안: 9월/8월/7월/6월/5월), 기본 = 이번 달
+  const QUICK = Prada.period.months(5);
+  const state = {
+    from: ymd(QUICK[0].range[0]), to: ymd(QUICK[0].range[1]), quick: QUICK[0].key,
+    page: 1, pageSize: 50, field: 'all', query: '',
+    filters: { type: null, editor: null, target: null }
+  };
+  const view = document.getElementById('view');
+
+  function filtered() {
+    const from = parse(state.from);
+    const to = new Date(parse(state.to).getTime() + 864e5);
+    const q = state.query.trim().toLowerCase();
+    const f = state.filters;
+    return logs.filter((l) => l.time >= from && l.time < to &&
+      (!f.type || f.type.has(TYPES[l.type])) && (!f.editor || f.editor.has(l.editor)) && (!f.target || f.target.has(l.target)) &&
+      (!q || (state.field === 'all' ? Object.keys(FIELDS) : [state.field]).some((k) => l[k].toLowerCase().includes(q))));
+  }
+
+  const thFilter = (col, label) => `
+    <th class="col-120 col-th-btn">
+      <button class="th-btn ${state.filters[col] ? 'is-active' : ''}" type="button" data-filter-col="${col}" aria-haspopup="dialog">${label}${icon('i-filter', 12)}</button>
+    </th>`;
+  const link = (l) => `<a class="cell-link" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.product)}</a>`;
+
+  function renderList() {
+    const rows = filtered();
+    const totalPages = Math.max(1, Math.ceil(rows.length / state.pageSize));
+    state.page = Math.min(state.page, totalPages);
+    const pageRows = rows.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
+
+    view.innerHTML = `
+      ${searchBarHTML(state.query)}
+      <div class="list-block">
+        <div class="toolbar toolbar--period">
+          ${Prada.period.html(state, QUICK)}
+          ${MASTER ? `<button class="btn btn--lg btn--line" type="button" data-act="excel">${icon('i-download', 16)}엑셀 저장</button>` : ''}
+        </div>
+        <div class="table-scroll">
+          <table class="table edit-table">
+            <thead><tr>
+              <th class="col-time">수정시간</th>
+              ${thFilter('type', '구분')}
+              <th class="col-120">No</th>
+              ${thFilter('editor', '수정자 ID')}
+              ${thFilter('target', '대상자 ID')}
+              <th class="col-product">상품명</th>
+              <th class="col-120">키워드</th>
+              <th class="col-120">프로덕트</th>
+              <th class="col-120">벤더</th>
+              <th class="col-icon">수정전</th>
+            </tr></thead>
+            <tbody>
+              ${pageRows.length ? pageRows.map((l) => `
+                <tr>
+                  <td>${timeText(l.time)}</td>
+                  <td>${TYPES[l.type]}</td>
+                  <td>${l.no}</td>
+                  <td>${esc(l.editor)}</td>
+                  <td>${esc(l.target)}</td>
+                  <td>${link(l)}</td>
+                  <td>${esc(l.keyword)}</td>
+                  <td>${l.productId}</td>
+                  <td>${l.vendorId}</td>
+                  <td class="col-icon">${l.type === 'edit' ? `<button class="cell-icon-btn" type="button" data-before="${l.id}" aria-label="${l.no} 수정 전 데이터 보기">${icon('i-history')}</button>` : ''}</td>
+                </tr>`).join('') : '<tr><td class="table__empty" colspan="10">검색 결과가 없습니다.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ${listNavHTML(state.page, totalPages)}`;
+
+    mountSelect(view.querySelector('[data-select="field"]'),
+      [{ value: 'all', label: '전체' }, ...Object.entries(FIELDS).map(([value, label]) => ({ value, label }))],
+      state.field, (v) => { state.field = v; });
+    mountSelect(view.querySelector('[data-select="size"]'),
+      [10, 30, 50].map((n) => ({ value: String(n), label: `${n}개씩 보기` })),
+      String(state.pageSize), (v) => { state.pageSize = Number(v); state.page = 1; renderList(); });
+    syncScrollBtn();
+  }
+
+  /* ---------------- 기간 (prada.js Prada.period) ---------------- */
+  Prada.period.bind(view, () => state, QUICK, (from, to, quick) => {
+    Object.assign(state, { from, to, quick, page: 1 });
+    renderList();
+  });
+
+  view.addEventListener('click', (e) => {
+    if (e.target.closest('#searchClear')) {
+      view.querySelector('#searchInput').value = '';
+      if (state.query) { state.query = ''; state.page = 1; renderList(); } else syncSearchClear();
+      view.querySelector('#searchInput').focus();
+      return;
+    }
+    const pageBtn = e.target.closest('.pagination [data-page]');
+    if (pageBtn && !pageBtn.disabled) { state.page = Number(pageBtn.dataset.page); renderList(); return; }
+    const filterBtn = e.target.closest('[data-filter-col]');
+    if (filterBtn) {
+      const col = filterBtn.dataset.filterCol;
+      const values = col === 'type' ? Object.values(TYPES) : [...new Set(logs.map((l) => l[col]))];
+      Prada.filterPopover(filterBtn, {
+        options: values, selected: state.filters[col],
+        onApply: (set) => { state.filters[col] = set; state.page = 1; renderList(); }
+      });
+      return;
+    }
+    const before = e.target.closest('[data-before]');
+    if (before) { openBefore(Number(before.dataset.before)); return; }
+    if (e.target.closest('[data-act="excel"]')) exportCSV();
+  });
+  view.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (e.target.id === 'searchForm') {
+      state.query = view.querySelector('#searchInput').value; state.page = 1; renderList();
+    } else if (e.target.id === 'gotoForm') {
+      const total = Math.max(1, Math.ceil(filtered().length / state.pageSize));
+      const p = parseInt(view.querySelector('#gotoInput').value, 10);
+      state.page = Number.isFinite(p) ? Math.min(Math.max(p, 1), total) : state.page;
+      renderList();
+    }
+  });
+
+  /* ---------------- 엑셀 저장 (조회 결과 전체, CSV) ---------------- */
+  function exportCSV() {
+    const rows = filtered();
+    if (!rows.length) { showToast('error', '저장할 수정로그가 없습니다.'); return; }
+    const head = ['수정시간', '구분', 'No', '수정자 ID', '대상자 ID', '상품명', '키워드', '프로덕트', '벤더'];
+    const body = rows.map((l) => [timeText(l.time), TYPES[l.type], l.no, l.editor, l.target, l.product, l.keyword, l.productId, l.vendorId]);
+    const cell = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = '﻿' + [head, ...body].map((r) => r.map(cell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `수정관리_${state.from.replace(/-/g, '')}-${state.to.replace(/-/g, '')}.csv` });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  /* ---------------- 수정 전 데이터 (Modal / Dialog 940) ---------------- */
+  // 정보수정 행만: 같은 광고의 바로 이전 값(시안용 예시 — 키워드·상품명이 달랐던 것으로)
+  const beforeModal = document.getElementById('beforeModal');
+  function openBefore(id) {
+    const l = logs[id];
+    const r = seeded(l.no);
+    const [product, keyword] = PRODUCTS[(PRODUCTS.findIndex((p) => p[0] === l.product) + 1 + Math.floor(r() * 2)) % PRODUCTS.length];
+    const prev = { ...l, product, keyword, time: new Date(l.time.getTime() - (1 + Math.floor(r() * 72)) * 36e5) };
+    document.getElementById('beforeTable').innerHTML = `
+      <colgroup><col style="width:110px"><col style="width:72px"><col style="width:72px"><col style="width:72px"><col style="width:72px"><col style="width:202px"><col style="width:100px"><col style="width:100px"><col style="width:100px"></colgroup>
+      <thead><tr><th>수정시간</th><th>구분</th><th>No</th><th>수정자 ID</th><th>대상자 ID</th><th>상품명</th><th>키워드</th><th>프로덕트</th><th>벤더</th></tr></thead>
+      <tbody><tr>
+        <td>${timeText(prev.time)}</td><td>${TYPES[prev.type]}</td><td>${prev.no}</td><td>${esc(prev.editor)}</td><td>${esc(prev.target)}</td>
+        <td class="col-name" title="${esc(prev.product)}">${link(prev)}</td><td>${esc(prev.keyword)}</td><td>${prev.productId}</td><td>${prev.vendorId}</td>
+      </tr></tbody>`;
+    beforeModal.hidden = false;
+    beforeModal.querySelector('.dialog').focus();
+  }
+  function closeBefore() { beforeModal.hidden = true; }
+  beforeModal.addEventListener('click', (e) => { if (e.target === beforeModal || e.target.closest('[data-before-close]')) closeBefore(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeBefore(); });
+
+  renderList();
+  view.classList.add('is-entering');   // 화면 진입 페이드
+})();
+</script>
+</body>
+</html>

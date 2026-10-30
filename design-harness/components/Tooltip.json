@@ -1,0 +1,27 @@
+{
+  "name": "Tooltip",
+  "figmaKey": null,
+  "codePath": "prada.js data-tooltip",
+  "intent": "잘린 글자나 아이콘의 뜻을 짧게 보여 준다.",
+  "variants": {
+    "type": [
+      "default",
+      "chart(DS Chart Tooltip)"
+    ]
+  },
+  "tokens": {
+    "default": "components.tooltip",
+    "chart": "components.chart-tooltip"
+  },
+  "use": [
+    "요소에 data-tooltip만 단다. 글자 바로 아래 2px, 글자 가운데, 150ms 페이드.",
+    "차트 툴팁: 점 오른쪽 9에 꼬리, 날짜 + 세 순위, 고른 순위 줄만 굵게."
+  ],
+  "avoid": [
+    "긴 문장을 넣지 않는다(한 줄).",
+    "툴팁에 버튼·링크를 넣지 않는다."
+  ],
+  "a11y": [
+    "role=tooltip, 대상에 aria-describedby, 키보드 포커스에도 보인다."
+  ]
+}
