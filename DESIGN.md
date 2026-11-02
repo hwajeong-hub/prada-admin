@@ -1,11 +1,25 @@
-# PRADA 어드민 디자인 규칙 (Design Rules)
+# PRADA 어드민 — DESIGN.md
 
-> 이 문서는 **HERMES-PRADA 화면 파일**과 **Prada 디자인 시스템 파일**을 직접 분석해, 화면이 디자인 시스템을 *어떻게* 쓰는지(규칙성)를 정리한 것입니다.
+> 누구나(사람이든 AI 에이전트든) 피그마 없이 **같은 규칙으로** PRADA 어드민 화면을 만들고 새 화면을 설계할 수 있도록 정리한 **유일한 디자인 규칙 문서**입니다.
 > "로그인 화면 만들어줘", "공지사항 목록 만들어줘"처럼 짧게 요청해도 이 문서만으로 Figma 시안과 같은 결과가 나오도록 하는 것이 목적입니다.
 >
-> - 화면 파일: `TZaAAe9JHlRDhSF4JtLDqQ` › page `draft` › section `PRADA` (node `4259:36390`)
-> - 디자인 시스템: `gvxPykrBYRlbCzyM5wTqWz` (Foundation / Asset / Components / Templates)
-> - 분석 범위: 화면 프레임 114개, 텍스트 노드 약 11,600개, 컴포넌트 인스턴스 약 9,700개 (2026-10-29 기준)
+> - 화면 파일: Figma `TZaAAe9JHlRDhSF4JtLDqQ` › page `draft` › section `PRADA` (node `4259:36390`)
+> - 디자인 시스템: Figma `gvxPykrBYRlbCzyM5wTqWz` (Foundation / Asset / Components / Templates)
+> - 분석 범위: 화면 프레임 114개, 텍스트 노드 약 11,600개, 컴포넌트 인스턴스 약 9,700개 (2026-10-29 기준), 화면 구현·실측 2026-10-30 완료
+> - 구현 기준 파일: `prada.css`(토큰·컴포넌트·모션·셸) · `prada.js`(셸·공통 동작). 문서와 코드가 다르면 **문서를 먼저 고치고** 코드를 맞춘다.
+
+## 목차
+
+0. 에이전트가 지켜야 할 최우선 규칙
+1. Foundation 토큰 (+ 1.7 Logo · Favicon, 1.8 Responsive)
+2. 컴포넌트 규칙
+3. 화면(Page) 템플릿 — 3.0 첫 화면 ~ 3.14 캠페인
+4. 문구(Copy) 규칙
+5. 코드 구현용 CSS 변수
+6. 작업 규칙 · 금지
+7. 확정된 결정
+8. 화면 목록 · 실행 방법 · 새 화면 만드는 법
+9. 미확정 항목 (확인 필요)
 
 ---
 
@@ -182,6 +196,203 @@
 | Drop Shadow/Depth 1 | 0 2 8 rgba(11,25,47,.07) | 상단 Header, 사용자 메뉴 |
 | Drop Shadow/Depth 2 | 0 3 6 rgba(11,25,47,.07) | Side Navigation |
 | Drop Shadow/Depth 3 | 2 3 12 rgba(11,25,47,.08) | Alert(토스트) |
+
+---
+
+### 1.7 Logo · Favicon
+
+서비스(19개)마다 바뀌는 것은 **로고와 파비콘뿐**입니다. 컬러 · 타이포그래피 · 간격 · 컴포넌트 등 나머지 디자인 시스템은 모든 서비스가 공통으로 사용합니다.
+
+| 컴포넌트 | 변형 | 설명 |
+|---|---|---|
+| **Logo** | Service = PRADA · GUARD · BULDAK · BATTERY · SEARCH · MAKE · MOUNTAIN · EASY · INDEX · AUSTIN · DOUBLE · PROBE · ROYAL · AURA · JAMONG · SERIES · JAMONG PLUS · GUARD PLUS · SIREN<br>Color = Navy · White | 서비스별 워드마크. **높이 14 공통** (로그인 화면만 높이 28 · 너비 132). Navy(Text/Brand)는 밝은 배경(Header · 로그인), White(Text/Inverse)는 어두운 배경(내비게이션 · 썸네일)에 씁니다. |
+| **Favicon** | Service = PRADA · GUARD · BULDAK · BATTERY · SEARCH · MAKE · MOUNTAIN · EASY · INDEX · AUSTIN · DOUBLE · PROBE · ROYAL · AURA · JAMONG · SERIES · JAMONG PLUS · GUARD PLUS · SIREN<br>Size = 180 · 96 · 32 · 16 | 180 Apple Touch Icon · 96 데스크톱 바로가기 · 32 작업표시줄 · 16 브라우저 탭. 배경 BG/Brand + 서비스 첫 글자 심볼 Text/Inverse. |
+
+- **워드마크 · 심볼 글꼴:** Gotham Rounded Bold (신규 서비스는 [LOGO & FAVICON MAKER](https://claude.ai/artifact/UJgKrXuSEo8kDvc6oSSJ2Q)로 생성)
+
+**서비스별 예외**
+
+| 서비스 | 예외 내용 |
+|---|---|
+| ROYAL | 자체 브랜드 색 사용 (토큰 미연결) — 로고 Navy 변형 `#6D28D9`, 파비콘 배경 `#651FD3` |
+| SIREN | 자체 브랜드 색 `#E53935` 사용 (로고 · 파비콘 배경, 토큰 미연결). 파비콘 심볼은 이니셜 대신 사이렌 아이콘 |
+| JAMONG PLUS · GUARD PLUS | 파비콘 심볼 `J+` · `G+` (첫 글자 + 플러스) |
+
+**관리 방법**
+
+1. 서비스별 컴포넌트를 따로 만들지 않고, Logo · Favicon 세트에 **Service 변형**으로 추가합니다.
+2. 화면에서는 Logo 인스턴스의 **Service 속성만** 바꿉니다. Header는 Logo가 노출(Expose)돼 있어 Header를 선택한 상태에서 바로 바꿀 수 있습니다.
+3. 신규 서비스는 아래 **SVG 추출 규칙**에 맞춰 만들면 그대로 Export해 개발에 전달할 수 있습니다.
+
+#### SVG 추출 규칙
+
+Logo · Favicon의 **각 변형(컴포넌트) 프레임이 곧 SVG 캔버스**입니다. 아래 규칙대로 만든 변형은 추가 편집 없이 바로 Export합니다.
+
+**Export 설정 (Figma)**
+
+| 항목 | 값 |
+|---|---|
+| 대상 | Logo · Favicon 세트의 변형 프레임 1개 = SVG 1개 |
+| Format | SVG, 1x |
+| Include "id" attribute | 끄기 |
+| Outline text | 켜기 |
+| Simplify stroke | 켜기 |
+
+**Logo SVG 규격**
+
+| 항목 | 규칙 |
+|---|---|
+| 캔버스 | 높이 **14** 고정, 너비는 원본 비율로 계산 후 **정수로 반올림** (소수 여백은 좌우 균등) |
+| viewBox | `0 0 {너비} 14` — 여백 없이 글자가 캔버스에 꽉 차게 |
+| 레이어 | 벡터 1개(`Wordmark`). 선(stroke)은 모두 아웃라인 처리 후 합치기 |
+| 사용 요소 | `<svg>` + `<path>`만. `<g>` · `clip-path` · `mask` · `transform` · `stroke` 없음 |
+| 색 | Navy `#1B2A41` (Text/Brand) · White `#FFFFFF` (Text/Inverse) 단색 |
+
+| 서비스 | PRADA | GUARD | BULDAK | BATTERY | SEARCH | MAKE | MOUNTAIN |
+|---|---|---|---|---|---|---|---|
+| 너비 × 14 | 66 | 66 | 79 | 86 | 126 | 51.9 | 96.1 |
+
+| 서비스 | EASY | INDEX | AUSTIN | DOUBLE | PROBE | ROYAL |
+|---|---|---|---|---|---|---|
+| 너비 × 14 | 45.5 | 55.4 | 65.2 | 72.9 | 60.3 | 59.4 |
+
+| 서비스 | AURA | JAMONG | SERIES | JAMONG PLUS | GUARD PLUS | SIREN |
+|---|---|---|---|---|---|---|
+| 너비 × 14 | 53.3 | 79.2 | 59.4 | 131.4 | 117.4 | 68.4 |
+
+**Favicon SVG 규격**
+
+| 항목 | 규칙 |
+|---|---|
+| 캔버스 · viewBox | `0 0 {S} {S}` (S = 180 · 96 · 32 · 16) |
+| 레이어 | `Background`(사각형) + `Symbol`(벡터 1개), 그룹 없음 |
+| Background | `<rect width="S" height="S" rx="S÷6" fill="#1B2A41">` |
+| Symbol | `<path fill="#FFFFFF">` — 서비스 워드마크의 첫 글자 |
+| Symbol 영역 | 너비 S×0.611 · 높이 S×0.633 (180 기준 110×114) 안에 비율 유지해 맞추고 가운데 정렬 |
+| 사용 요소 | `<svg>` + `<rect>` + `<path>`만. `clip-path` 없음 (프레임 Clip content 끄기) |
+
+| Size | 180 | 96 | 32 | 16 |
+|---|---|---|---|---|
+| rx | 30 | 16 | 5.33333 | 2.66667 |
+| Symbol 영역 | 110×114 | 58.7×60.8 | 19.6×20.3 | 9.8×10.1 |
+
+**SVG 템플릿**
+
+```svg
+<!-- logo-{service}-navy.svg -->
+<svg width="{W}" height="14" viewBox="0 0 {W} 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="…" fill="#1B2A41"/>
+</svg>
+```
+
+```svg
+<!-- favicon-{service}-32.svg -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="5.33333" fill="#1B2A41"/>
+  <path d="…" fill="#FFFFFF"/>
+</svg>
+```
+
+**파일 이름 · 전달 구조**
+
+```text
+brand/
+  {service}/
+    logo-{service}-navy.svg
+    logo-{service}-white.svg
+    favicon-{service}-16.svg   (+ .png)
+    favicon-{service}-32.svg   (+ .png)
+    favicon-{service}-96.svg   (+ .png)
+    apple-touch-icon-{service}.png   (180)
+```
+
+- 영문 소문자 · 하이픈만 씁니다. (예: `logo-search-navy.svg`, `favicon-make-32.png`)
+- PNG는 같은 변형을 PNG 1x로 Export합니다. 180은 `apple-touch-icon`으로 전달합니다.
+
+```html
+<link rel="icon" type="image/png" sizes="16x16" href="/brand/{service}/favicon-{service}-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/brand/{service}/favicon-{service}-32.png">
+<link rel="icon" type="image/png" sizes="96x96" href="/brand/{service}/favicon-{service}-96.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/brand/{service}/apple-touch-icon-{service}.png">
+```
+
+**신규 서비스 추가 · 검수 체크리스트**
+
+- [ ] Logo: Navy · White 2개 변형, 높이 14, 너비 정수, 벡터 1개, stroke 없음
+- [ ] Favicon: 180 · 96 · 32 · 16 4개 변형, Background + Symbol 2개 레이어, rx = S÷6, Clip content 끔
+- [ ] 색: `#1B2A41` · `#FFFFFF` 두 가지만 (토큰 Text/Brand · Text/Inverse · BG/Brand 연결)
+- [ ] Export한 SVG에 `<g>` · `clip-path` · `stroke` · `transform`이 없는지 확인
+- [ ] 파일명 규칙 확인 후 `brand/{service}/` 폴더로 전달
+
+**현재 확인 필요**
+
+- 로고 너비가 소수인 서비스가 있습니다 (MAKE 51.9 · MOUNTAIN 96.1 · EASY 45.5 등). SVG 규격(너비 정수)에 맞추려면 프레임 너비를 반올림하고 글자를 가운데 정렬합니다.
+- ROYAL의 브랜드 색이 로고(`#6D28D9`)와 파비콘(`#651FD3`)에서 다릅니다. 한 값으로 통일이 필요합니다.
+- BULDAK과 BATTERY 파비콘이 같은 'B' 심볼입니다. 브라우저 탭에서 구분이 필요하면 심볼 조정을 검토합니다.
+- SEARCH 파비콘의 S는 획이 가늘어 16×16에서 얇게 보일 수 있습니다.
+
+### 1.8 Responsive
+
+데스크톱(1920)과 모바일(360) 두 화면을 기준으로 한 대응 규칙입니다.
+같은 컴포넌트를 쓰고 **레이아웃 · 글자 크기 · 팝업 형태만** 바꾸며, 넘치는 영역은 **가로 스크롤**로 처리합니다.
+
+#### Breakpoint · Layout
+
+| 항목 | Desktop | Mobile |
+|---|---|---|
+| 기준 화면 | 1920 × 1080 | 360 × 740 |
+| 헤더 | Header Device=Desktop · 높이 52 | Header Device=Mobile · 높이 52 · 메뉴 버튼 |
+| 내비게이션 | Side Navigation 180 고정 | Mobile Menu (헤더 메뉴 버튼으로 열기) |
+| 콘텐츠 여백 | 좌우 Spacing/24 · 콘텐츠 1692 | 좌우 Spacing/20 · 콘텐츠 320 |
+| 상단 여백 | 헤더 아래 Spacing/32 | 헤더 아래 Spacing/20 |
+| 섹션 간격 | 제목 영역 → 콘텐츠 Spacing/40 | 모든 섹션 Spacing/24 |
+| 페이지 배경 | Background/Subtle | Background/Subtle (동일) |
+| 중간 폭 (실서비스) | 1920 → 1065px: 사이드 내비게이션 180 유지, 콘텐츠는 FILL로 축소, 지표 항목 균등 축소 + 라벨 줄바꿈, 테이블 가로 스크롤 | 약 500px 이하에서 모바일 레이아웃으로 전환 (Header Device=Mobile, 사이드 내비게이션 숨김) |
+
+#### 대응 원칙
+
+데스크톱 컴포넌트를 모바일용으로 새로 만들지 않습니다. 아래 네 가지 방법 중 하나로 대응합니다.
+
+1. **속성 전환:** 같은 컴포넌트에서 `Device` 또는 `Size`만 바꿉니다. (Header, Nav Item, Modal, Dialog, Drawer)
+2. **대체:** 데스크톱 요소를 같은 역할의 모바일 요소로 바꿉니다. (Side Navigation → 헤더 메뉴 버튼 + Mobile Menu)
+3. **재배치:** 컴포넌트는 그대로 두고 배치만 바꿉니다. (가로 1줄 → 2×2 또는 세로 스택, 일부 요소 숨김)
+4. **가로 스크롤:** 줄이면 정보가 손실되는 영역은 너비를 유지하고 가로로 스크롤합니다. (Table)
+
+| 컴포넌트 | 대응 방법 | Mobile |
+|---|---|---|
+| Header | 속성 전환 | Device=Mobile · 로고 + 메뉴 버튼(Icon/Menu, Icon/Brand) |
+| Side Navigation | 대체 | Mobile Menu(300 패널) · Nav Item / Nav Dropdown / Nav Sub Item을 Device=Mobile로 사용 |
+| Metric Card | 재배치 | 기간 1줄 + 지표 2×2, Metric Item은 FILL 균등 분배 |
+| Filter (Search · Date Field · Button) | 재배치 | 검색 1줄 + 기간 1줄, 기간 빠른 선택 · 엑셀 저장 숨김 |
+| Table | 가로 스크롤 | 컬럼 너비 유지 |
+| Pagination | 재배치 | 페이지 번호 / Go to page 2줄 스택 |
+| Modal · Dialog | 속성 전환 | Device=Mobile · Size=Mobile 340 (viewport − 20) |
+| Drawer | 속성 전환 | Size=Mobile · 전체 화면 360(100%) |
+| Alert | 크기 조정 | 340 × 56 |
+
+#### 화면 구성 대응 (예: [마스터] 정산로그)
+
+| 영역 | Desktop 1920 | Mobile 360 |
+|---|---|---|
+| Header | 로고 + 사용자 메뉴 | 로고 + ≡ (사이드 내비게이션 대체) |
+| Metric | 1줄 (기간 + 4열) | 기간 1줄 + 지표 2×2 |
+| Filter | 검색 · 기간 · 빠른선택 · 엑셀 저장 | 검색 1줄 + 기간 1줄 (빠른선택 · 엑셀 숨김) |
+| Table | 1692 전체 너비 · 11컬럼 노출 | 너비 유지 → 가로 스크롤 |
+| Pagination | 페이지 번호 + Go to page 1줄 | 페이지 번호 / Go to page 2줄 스택 |
+
+#### Modal (모바일 대응)
+
+모바일에서 Modal · Dialog · Drawer는 새로 만들지 않고 **Device · Size 속성**으로 대응합니다.
+Modal · Dialog는 화면 중앙에 340(viewport − 20)으로, Drawer는 전체 화면 360으로 노출합니다.
+사이즈별 상세 사양은 [Modal / Drawer](#modal--drawer)를 참고하세요.
+
+| 컴포넌트 | Desktop | Mobile |
+|---|---|---|
+| Modal (확인) | Device=PC 360 · 패딩 Spacing/40 | Device=Mobile 340 · 패딩 Spacing/20 |
+| Dialog (조회) | Size=Medium 600 · Large 820 · XLarge 980 | Size=Mobile 340 · 패딩 Spacing/20 |
+| Drawer (입력 폼) | Size=Small 328 · Medium 488 · Large 568 | Size=Mobile 360 · 전체 화면 · 하단 버튼 2개 |
+| 닫기 (공통) | Icon/Close Large · 상·우 20 | Icon/Close Large · 상·우 10 |
+| 뒤 배경 | Background/Dim (검정 45%) | Background/Dim (동일, Drawer는 전체 화면) |
 
 ---
 
@@ -811,3 +1022,157 @@ Figma의 1px 테두리는 크기 안쪽에 그려져 크기·위치를 바꾸지
 .caption-1-regular  { font: 400 11px/16.5px var(--font-family); }
 ```
 
+---
+
+## 6. 작업 규칙 · 금지
+
+### 6.1 작업 방식
+- UI 작업 전에 이 문서를 읽는다. 쓸 컴포넌트는 §2, 만들 화면과 가장 비슷한 템플릿은 §3을 먼저 본다.
+- **Figma가 정답이다.** 화면을 만들기 전에 Figma(MCP)로 구조·수치·토큰을 읽고, 시안 스크린샷과 나란히 본다. 빈 화면에서 시작하지 않는다.
+- 만든 뒤에는 **브라우저에서 실측**해 Figma 값과 대조한다(PC 1920×1080, 모바일 360). 위치·크기 ±1px, 맞지 않으면 고치고 다시 잰다.
+- 공통으로 쓰일 것은 화면 파일이 아니라 `prada.css` / `prada.js`에 넣는다(기간 선택, 툴팁, 확인창, 필터 팝오버, 로딩, 현황 카드 맞춤 등). 화면 파일에는 그 화면에만 있는 것만.
+- 공통 파일을 고치면 모든 화면의 `prada.css?v=…` · `prada.js?v=…` 값을 올린다(옛 캐시가 보이지 않게).
+- 시안에 없어서 정한 값·문구·동작은 §9 "미확정 항목"에 적고 사용자에게 알린다. 확정되면 §7 "확정된 결정"으로 옮긴다.
+- 새로 알게 된 규칙은 작업이 끝날 때 이 문서에 반영한다(화면은 §3, 공통은 §2·§6·§7).
+
+### 6.2 도구
+- 화면 시안: Figma `TZaAAe9JHlRDhSF4JtLDqQ` › draft › PRADA(`4259:36390`) / 첫 화면 `8164:34347` / 순위조회 `8061:96395`
+- 디자인 시스템: Figma `gvxPykrBYRlbCzyM5wTqWz`
+- 코드: `prada.css`(토큰·컴포넌트·모션·셸) · `prada.js`(셸 주입·권한·공통 동작, `window.Prada`) · 화면별 `*.html`
+- 미리보기: `python3 -m http.server 4173` → `http://localhost:4173/` (첫 화면)
+
+### 6.3 금지
+- 이 문서 §1에 없는 색·글자 크기·간격·반지름 값을 쓰지 않는다.
+- 입력·버튼·드롭다운·표를 둥글게 하지 않는다.
+- 모달·팝업이 열릴 때 버튼에 자동 포커스를 주지 않는다(포커스 링이 테두리처럼 보인다).
+- 사라지는 모션(닫기·퇴장)에 시간을 주지 않는다. 즉시 사라진다.
+- 기획서 그림으로 시안 디자인을 바꾸지 않는다. **디자인은 시안, 동작은 기획서.**
+- 사용자 확인 없이 외부에 게시하지 않는다. 데모 계정 비밀번호를 대화에 쓰지 않는다.
+- body에 `data-page`를 쓰지 않는다(페이지 번호 버튼이 씀) → `data-prada-page`.
+
+- 새 글자 스타일 클래스를 쓰기 전에 `prada.css`에 있는지 확인하고, 없으면 만들거나 직접 지정한다(없는 클래스는 기본 16px로 보인다).
+
+---
+
+## 7. 확정된 결정 (다시 바꾸지 말 것)
+
+- 토스트 크기: PC 400 · 모바일(360) 320, 글자 13px — 실서비스(320·14px)와 다르지만 Figma 기준.
+- 토스트 인터랙션: 위 16px, 스프링 등장 270ms, 2.5초 유지, 35ms 위로 퇴장 (실서비스 녹화 실측).
+- 드롭다운: hover 배경 BG/Brand-Light-Hover 200ms, 열기 150ms 페이드+4px, 닫기 즉시, **선택된 옵션도 hover와 같은 배경 유지**, 항상 아래로 펼침.
+- 모션 공통: 상태 변화 200ms ease / 나타나기 150ms ease-out / 사라지기 즉시.
+- 모달·팝업이 열릴 때 버튼에 자동 포커스 금지 (포커스 링이 테두리처럼 보임).
+- 입력: DS 7가지 상태 모두 적용, 에러는 **빨간 테두리 + 아래 문구**.
+- 광고관리 [수정][삭제][연장]: 항상 기본 상태로 보임, Disabled 쓰지 않음 (선택이 없으면 누를 때 오류 토스트).
+- 순위보고서 차트: 고른 순위 선만 활성(진한 색), **활성 선의 점만 hover 가능**. 점 hover 시 DS Chart Tooltip(날짜 + 세 순위, 고른 순위만 굵게) 표시. 최고 순위 = #FE1818, 최저 순위 = #3B82F6 (DS Chart 색).
+- Segmented Control(일별↔시간별, 결제↔테스트): 선택 배경이 200ms로 미끄러지듯 이동. 컨트롤은 다시 그리지 말고 aria-checked만 바꿀 것.
+- 현황 카드(Metric Card): 항목 hover 시 파란색(Highlight=True), 누르면 표가 그 항목 데이터로 바뀌고 고른 항목은 파란색 유지 — 광고관리·계정관리 공통.
+- 광고관리 종료일: 종료예정·종료 광고는 Text/Error 빨간 글자 (Figma 홈 4개 프레임의 4·5번째 행 = 종료예정 예시, 9번째 행 = 종료 예시에 Text/Error 변수 연결함).
+- 일별마감 기간합계: 표 맨 위(최근 일자)부터 누적 — 확정 (2026-10-30).
+- 광고관리 [순위데이터 추출]·[발주데이터 추출]: 선택 없이 전체 데이터 파일, 누르면 로딩 후 내려받기.
+- 현황 카드 반응형: 좁아지면 기간 값은 "~" 뒤 두 줄, 그래도 넘치면 글자 축소(최소 12px) — prada.js가 자동 처리.
+- 캠페인 정산관리 단가설정: 구간(이상~미만) 입력은 NBT 매체 선택 시에만.
+- 광고관리 로직관리: **디자인은 PRADA 시안 그대로**, 작동만 기획서(캡처) 기준 — 숫자 3자리만, 빈칸 0%, 합계 실시간·100% 아니면 빨강 + [저장] 비활성, [취소]는 변경 버림. (사용자 확정)
+- 툴팁 위치: 마우스를 올린 글자 바로 아래 2px, 글자 가운데.
+- 첫 화면(index.html)에서 권한 선택 → 권한별 메뉴·기능 분기. 순위조회는 사이드바에서 빼고 첫 화면 버튼으로만.
+- FAQ: 한 번에 하나만 펼침, 오른쪽 아이콘 접힘 Chevron Down → 펼침 Chevron Up (DS Templates › Accordion Item).
+- 체크박스: 체크 아이콘 14를 16 박스 가운데 정렬 (DS 원본).
+- 검색 지우기 X: DS Close 아이콘 20, 브라우저 기본 X는 숨김.
+- 계정관리 [삭제]: 선택된 계정이 없으면 Disabled, 선택하면 활성 (계정관리만 — 광고관리는 항상 기본 상태).
+- 현황 카드 중 표와 1:1로 대응하지 않는 카드(일별마감·서비스관리·캠페인 요약)는 누를 수 없다.
+
+---
+
+## 8. 화면 목록 · 실행 방법 · 새 화면 만드는 법
+
+### 8.1 화면 목록
+
+| 파일 | 내용 | 상태 |
+|---|---|---|
+| `index.html` | **첫 화면**: 로고 + 권한 선택 버튼 5개(마스터·총판·대행사·광고주(일반)·순위조회) → 권한별 분기 | 완료 |
+| `login.html` | 로그인 (PC·모바일), 실패 토스트, 아이디 기억하기, 데모 계정 로그인 → 공지사항 이동 | 완료 |
+| `prada.css` | **로그인 후 모든 화면 공통 스타일**: 토큰·글자 스타일·컴포넌트(버튼·입력·드롭다운·체크박스·표·페이지네이션·토스트·모달·Drawer)·모션 공통 규칙·셸(헤더·사이드바·모바일 메뉴) | 완료 |
+| `prada.js` | **공통 셸 스크립트**: 아이콘·헤더·사이드바·모바일 메뉴·프로필 수정 Drawer·토스트·스크롤 버튼을 자동으로 넣고, 로그인 아이디·권한 표시, 로그아웃, 입력 에러 표시까지 처리 | 완료 |
+| `notice.html` | 공지사항: 목록·상세·작성·수정, 첫 진입 팝업, 삭제 확인, 검색·페이지네이션, 권한별 화면(`?role=agency`) — 화면 고유 부분만 | 완료 |
+| `faq.html` | 자주 묻는 질문: 아코디언(한 번에 하나만, 200ms 펼침) — 화면 고유 부분만 | 완료 |
+| `ads.html` | 광고관리: 현황 카드 3개, 툴팁, 필터(아이디·상태), 광고수정(568, 키워드 태그)·광고연장·계정정보 Drawer, 삭제 확인, 순위보고서(일별·시간별 차트, 데이터 없음 + 오류 안내), 로직관리 팝업, 순위·발주 데이터 CSV 추출, 권한별 화면 | 완료 |
+| `settle.html` | 정산로그: 검색 결과 현황(누르면 구분별), 기간(날짜 2칸 + 오늘·1일전·최근 4개월), 필터(구분·총판사·대행사·광고주), 삭제 로그 팝업, 엑셀 저장(CSV), 권한별 열(`?role=agency` · `?role=advertiser`) | 완료 |
+| `edit.html` | 수정관리: 기간(날짜 2칸 + 최근 5개월), 필터(구분·수정자 ID·대상자 ID), 수정 전 데이터 팝업, 엑셀 저장(마스터만), 권한별 화면 | 완료 |
+| `campaign-summary.html` · `campaign.html` · `campaign-settle.html` (+ `campaign-data.js`) | 캠페인: 사이드바 펼침 메뉴(캠페인 요약·캠페인 관리·정산관리), 요약 표, 광고 노출 ON/OFF 토글(확인창+토스트)·정답 수정 팝업, 매체 칩·로딩·단가설정 팝업(구간추가)·정산 다운로드 | 완료 (PC·모바일 실측) |
+| `daily.html` | 일별마감: 검색 결과 현황, 기간(날짜 2칸 + 최근 5개월), 일자별 발주·연장·환불·일수합계·기간합계 표, 엑셀 저장 | 완료 |
+| `rank.html` | 순위조회: 상품 URL + 키워드 태그 입력, 키워드별 탭 결과 표, 상품 URL 복사, 조회 전·못 찾음 빈 상태 — **별도 어드민**: 시안대로 로고·사이드바 메뉴 없는 빈 셸, 첫 화면 [순위조회]로만 들어감(권한 무관) | 완료 |
+| `service.html` | 서비스관리[마스터]: 검색 결과 현황(서비스명 포함), 기간 + 서비스 Dropdown, 서비스×계정 표 | 완료 |
+| (prada.js) 사용시간 설정 | 사이드바 메뉴 → 지금 화면 위 Drawer(미니 달력 + 발주·수정·환불 시간), 마스터만 | 완료 |
+| `account.html` | 계정관리: 현황 카드, 필터(아이디·권한·소속)·정렬(수량), 광고추가·계정등록·계정수정 Drawer, 삭제(선택 시에만 활성 + 오류 + 확인), **사용시간 설정(달력 팝업)**, 권한별 화면 | 완료 |
+
+- 모든 화면은 Figma와 **위치·크기를 브라우저에서 실측해 대조**했습니다 (PC 1920×1080 / 모바일 360).
+- 데모 계정: `login.html`의 `DEMO_ACCOUNTS` (관리자용 1개, 총판용 1개).
+
+### 8.2 화면 띄우는 방법
+
+이 폴더에서 로컬 서버를 켜고 브라우저로 엽니다. 
+
+```bash
+python3 -m http.server 4173
+```
+
+열 주소: **`http://localhost:4173/`** (첫 화면) → [마스터][총판][대행사][광고주(일반)] 중 하나를 누르면 그 권한의 PRADA로, [순위조회]는 순위조회 화면으로. 로그인 화면(`login.html`)도 그대로 있음 — 권한별 데모 계정은 `login.html`의 `DEMO_ACCOUNTS`.
+
+### 8.3 새 화면 만드는 법 (공통 파일 사용)
+```html
+<link rel="stylesheet" href="prada.css">          <!-- head: Pretendard 다음 -->
+<style> /* 이 화면에만 필요한 스타일 */ </style>
+<body data-prada-page="account.html">             <!-- 사이드바 현재 메뉴 표시용 -->
+<div class="app-body">
+  <main class="main">
+    <div class="page-header"> 제목 · 설명 </div>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+<script src="prada.js"></script>                   <!-- 반드시 화면 스크립트보다 먼저 -->
+<script> const { esc, icon, showToast, setInputError, clearInputError, syncScrollBtn } = Prada; … </script>
+```
+- 사이드바 메뉴 연결: `prada.js`의 `NAV` 배열에서 해당 메뉴의 `'#'`를 새 파일명으로 바꿉니다. (4번째 값 `true` = 마스터 전용 메뉴)
+- 목록 화면 공통 도구 (`Prada.…`): `searchBarHTML` · `listNavHTML` · `mountSelect` · `checkbox` · `confirm({title,message})` · `filterPopover(버튼,{options,selected,onApply})` — `account.html`이 가장 완전한 예시.
+- 기간 선택(날짜 2칸 + 빠른 버튼): `Prada.period.html(state, quicks)` + `Prada.period.bind(view, () => state, quicks, (from, to, quick) => …)`, 빠른 버튼은 `Prada.period.days()` · `Prada.period.months(n)`. 툴바에 `toolbar--period` 클래스.
+- 툴팁: 요소에 `data-tooltip="문구"`만 달면 됨. 상세 토스트(제목+설명): `showToast('error', 메시지, 제목)`.
+- 공통 CSS 부품: Status Badge(`.status-badge--normal|error|wait`), Tag(`.tag--filled|outline`), Empty State(`.empty-state`), 목록 템플릿, Metric Card(`.metric`), Role Badge(`.role-badge--…`), Segmented(`.segmented`), 표 필터·정렬 헤더(`.th-btn`), 필터 팝오버(`.filter-pop`), Drawer(`.drawer`).
+- 권한: `Prada.role` = `master | distributor | agency | advertiser` (첫 화면·로그인에서 고른 권한, 또는 `?role=`), `Prada.isAgency` = 마스터가 아님. 마스터 전용 화면(서비스관리·캠페인)은 다른 권한이 열면 공지사항으로 이동.
+- 공통 파일을 고치면 각 화면의 `prada.css?v=…` · `prada.js?v=…` 값을 올린다 (브라우저 캐시 때문에 옛 스타일이 보이는 것 방지).
+- ⚠️ body에는 `data-page`가 아니라 **`data-prada-page`** — `data-page`는 페이지 번호 버튼이 씁니다.
+
+### 8.4 Figma 섹션 위치
+
+| 순서 | 섹션 | Figma node |
+|---|---|---|
+| 1 | 4. 계정관리 — **완료** (사용시간 설정 달력 포함) | `8051:86651` |
+| 2 | 5. 광고관리 — **완료** (홈·수정·삭제·연장·계정정보·순위보고서·로직관리) | `8059:51598` |
+| 3 | 6. 정산로그 — **완료** | `8061:96103` |
+| 4 | 7. 순위조회 — **완료** (`rank.html`) | `8061:96395` |
+| 5 | 8. 수정관리 — **완료** | `8061:96104` |
+| 6 | 9. 일별마감 — **완료** | `8061:96105` |
+| 7 | 10. 서비스관리 — **완료** | `8061:96106` |
+| 8 | 11. 사용시간 설정 (Drawer) — **완료** (사이드바 메뉴에서 여는 Drawer, 계정관리 달력 팝업과 별개) | `8051:86652` |
+| 9 | 12. 캠페인 — **완료** (요약·관리·정산관리) | `8064:105705` |
+
+---
+
+## 9. 미확정 항목 (시안에 없어서 임의로 정한 것)
+
+- 공지 검색 분류: 전체 / 제목 / 내용, 검색 결과 없음 문구 "검색 결과가 없습니다."
+- "N개씩 보기" 옵션: 10 / 30 / 50
+- 모바일에서 프로필 수정 진입: 모바일 메뉴 하단 프로필 영역
+- 에러 문구: "제목을 입력해 주세요." / "내용을 입력해 주세요." / "비밀번호를 입력해주세요."
+- 비밀번호는 저장하지 않음, 메모만 브라우저에 저장 (시안용)
+- 계정관리 사용시간 설정: [수정] 후 동작(닫기 + 성공 토스트 "사용시간 설정이 완료되었습니다."), 오류 문구("날짜를 선택해주세요.", 시간 형식·순서), 기본 시간 00:00~23:50, 예시 일정(이번 달 8·11·17·18일)
+- 계정관리: 검색 분류(전체/아이디/소속), 광고추가 "일수" placeholder, 에러 문구("작업 시작일을 선택해주세요.", "이미 사용 중인 아이디입니다."), 계정 목록 예시 데이터
+- 광고관리 툴바 **[로직관리] 버튼 위치**: PRADA 기준 시안에는 없고 MAKE·SEARCH 기준에만 있어서, 로직관리 팝업을 열 수 있게 맨 앞에 두었음 (마스터만). 빼거나 옮길지 확인 필요
+- 광고관리 [엑셀업로드]: 두 시안을 합쳐 [로직관리][순위데이터 추출][엑셀업로드][발주데이터 추출] 순서로 모두 둠, 업로드 완료·오류 문구는 임의
+- 광고관리 [수정]을 여러 개 선택하고 누르면: 첫 광고 값으로 채우고 **선택한 광고 모두에** 저장
+- 광고관리 추출: 전체 광고 CSV(엑셀에서 열림), 로딩 시간 0.8초는 시안용
+- 광고관리 오류 안내(Alert Detail)는 **오류 광고의 순위보고서를 열 때** 띄움. 종료예정 = 종료일까지 3일 이내
+- 광고관리 문구: 키워드 placeholder "키워드를 입력해주세요.", 오류 "이미 추가된 키워드입니다." / "키워드를 1개 이상 추가해주세요." / "연장 일수를 입력해주세요." / "합계는 100%여야 합니다."
+- 순위보고서: 상품 이미지는 자리만(회색 박스), 데이터는 예시
+- 정산로그: 빠른 기간 월 버튼은 "이번 달 포함 최근 4개월"(시안 7·6·5·4월), 이번 달은 1일~오늘. 기본 조회 = 오늘. 검색 분류(전체/총판사/대행사/광고주), 날짜 오류 문구, 일수 합계 계산(발주+연장−환불, 시안 30+94−26=98과 일치), 엑셀 저장 데이터 없음 문구 "저장할 정산로그가 없습니다.", 삭제 로그 내용은 예시
+- 광고관리 삭제 Error Case "광고가 남아있는 계정은 삭제할 수 없습니다." → 종료되지 않은 광고가 섞여 있으면 표시 (조건 임의)
+- 광고관리 [엑셀업로드] 완료 문구 "엑셀 업로드가 완료되었습니다." (실제 반영은 시안용으로 생략)
+- 로고·파비콘 관련 확인 필요 항목은 §1.7 끝 "현재 확인 필요" 참고

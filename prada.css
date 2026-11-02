@@ -1,10 +1,10 @@
 /* =========================================================
    PRADA 어드민 공통 스타일 — 로그인 후 모든 화면이 사용
-   기준: PRADA_DESIGN_RULES.md (토큰 §1 · 컴포넌트 §2 · 모션 공통 규칙 · 셸)
+   기준: DESIGN.md (토큰 §1 · 컴포넌트 §2 · 모션 공통 규칙 · 셸)
    화면별 스타일은 각 HTML의 <style>에 둔다.
    ========================================================= */
 /* =========================================================
-   1. Foundation 토큰 — PRADA_DESIGN_RULES.md §1, §5
+   1. Foundation 토큰 — DESIGN.md §1, §5
    ========================================================= */
 :root {
   --font-family: "Pretendard", -apple-system, sans-serif;
@@ -138,7 +138,7 @@ svg { display: block; flex: none; }
 .icon-btn.icon-btn--line-sm { width: 24px; height: 24px; background: var(--bg-surface); border: 1px solid var(--border-primary); color: var(--icon-default); transition: background-color var(--motion-state), border-color var(--motion-state); }
 .icon-btn.icon-btn--line-sm:hover { background: var(--bg-subtle); border-color: var(--border-brand); }
 
-/* Text Input / Text Area — DS 7가지 상태 (PRADA_DESIGN_RULES.md §2 Text Input)
+/* Text Input / Text Area — DS 7가지 상태 (DESIGN.md §2 Text Input)
    Default · Completed  : Border/Primary
    Hovered · Focused · Typing : Border/Brand (caret Icon/Brand)
    Error    : Border/Error + 아래 에러 메시지 (Caption 1 · Text/Error, 간격 4)
@@ -558,7 +558,7 @@ button.metric__item:focus-visible { outline: 2px solid var(--border-brand); outl
 .list-nav__right { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 12px; }
 
 /* =========================================================
-   2-1. 인터랙션 모션 공통 규칙 — PRADA_DESIGN_RULES.md §2 "모션 공통 규칙"
+   2-1. 인터랙션 모션 공통 규칙 — DESIGN.md §2 "모션 공통 규칙"
    상태 변화(hover·focus·선택) = 200ms ease 전환
    나타나기(목록·메뉴·모달·화면) = 150ms ease-out 페이드 (+ 위에서 4px)
    사라지기 = 즉시   ※ 드롭다운 실서비스 녹화 실측 기준
